@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>تصميم منشور إنستقرام بالعربي — أداة مجانية بلا خبرة تصميم</title>
 <meta name="description" content="اكتب نص عرضك وخذ تصميم منشور إنستقرام جاهز بالعربي: عروض، افتتاح، مواعيد، وظائف. مربّع وستوري. مجاني، بلا تسجيل، بلا برامج تصميم.">
+<meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0e10" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="./">
 <link rel="alternate" hreflang="ar" href="./">
 <link rel="alternate" hreflang="en" href="./en/">
@@ -19,68 +21,78 @@
 <link href="style.css" rel="stylesheet">
 </head>
 <body>
+
+<header class="top">
+  <span class="mark">مولّد المنشورات</span>
+  <a href="en/index.html" hreflang="en">English</a>
+  <button id="theme"></button>
+</header>
+
 <main>
-  <div class="top">
-    <a href="en/index.html" hreflang="en">English</a>
-    <button id="theme"></button>
-  </div>
-  <h1 data-i18n="h1"></h1>
-  <p class="lede" data-i18n="lede"></p>
-
-  <div class="fields">
-    <div class="two">
-      <div><label for="type" data-i18n="lType"></label><select id="type"></select></div>
-      <div><label for="size" data-i18n="lSize"></label><select id="size"></select></div>
-    </div>
-    <div><label for="title" id="titleLabel"></label>
-      <input id="title" maxlength="70" autocomplete="off"></div>
-    <div><label for="sub" id="subLabel"></label>
-      <textarea id="sub" rows="2" maxlength="140"></textarea></div>
-    <div><label for="name" data-i18n="lName"></label>
-      <input id="name" maxlength="40" autocomplete="off"></div>
-    <div><label for="photo" data-i18n="lPhoto"></label>
-      <div class="photo-row">
-        <input id="photo" type="file" accept="image/*">
-        <button id="clearPhoto" class="ghost" data-i18n="clearPhoto" hidden></button>
-      </div></div>
+  <div class="hero">
+    <h1 data-i18n="h1"></h1>
+    <p class="lede" data-i18n="lede"></p>
   </div>
 
-  <details id="brandBox">
-    <summary data-i18n="brand"></summary>
-    <div class="brand">
-      <label class="check"><input type="checkbox" id="useBrand"> <span data-i18n="useBrand"></span></label>
-      <div class="colors">
-        <label><span data-i18n="primary"></span> <input type="color" id="brandColor" value="#0B3D2E"></label>
-        <label><span data-i18n="accent"></span> <input type="color" id="brandAccent" value="#D4AF37"></label>
+  <div class="app">
+    <aside class="side">
+      <div class="card-box">
+        <div class="fields">
+          <div><label for="type" data-i18n="lType"></label>
+            <input id="typeSearch" type="search" data-i18n-ph="searchTypes" autocomplete="off">
+            <select id="type"></select>
+            <span id="typeNote" class="hint" hidden></span></div>
+          <div><label for="size" data-i18n="lSize"></label><select id="size"></select></div>
+          <div><label for="title" id="titleLabel"></label>
+            <input id="title" maxlength="70" autocomplete="off"></div>
+          <div><label for="sub" id="subLabel"></label>
+            <textarea id="sub" rows="2" maxlength="140"></textarea></div>
+          <div><label for="name" data-i18n="lName"></label>
+            <input id="name" maxlength="40" autocomplete="off"></div>
+          <div><label for="photo" data-i18n="lPhoto"></label>
+            <div class="photo-row">
+              <input id="photo" type="file" accept="image/*">
+              <button id="clearPhoto" class="ghost" data-i18n="clearPhoto" hidden></button>
+            </div></div>
+        </div>
       </div>
-      <div><label for="brandFont" data-i18n="bFont"></label><select id="brandFont"></select></div>
-      <div><label for="logo" data-i18n="lLogo"></label>
-        <div class="photo-row">
-          <input id="logo" type="file" accept="image/*">
-          <button id="clearLogo" class="ghost" data-i18n="clearLogo" hidden></button>
-        </div></div>
-    </div>
-  </details>
 
-  <div class="bar">
-    <button id="back" data-i18n="back" disabled></button>
-    <button id="more" data-i18n="more"></button>
-    <label class="check"><input type="checkbox" id="animate"> <span data-i18n="animate"></span></label>
-    <span id="motionCtl" class="sliders">
-      <label><span data-i18n="speed"></span>
-        <input type="range" id="speed" min="0.4" max="2.2" step="0.1" value="0.8"><b id="speedVal"></b></label>
-      <label><span data-i18n="power"></span>
-        <input type="range" id="power" min="0" max="1.8" step="0.1" value="0.3"><b id="powerVal"></b></label>
-    </span>
-    <span class="hint" data-i18n="hint"></span>
+      <details id="brandBox">
+        <summary data-i18n="brand"></summary>
+        <div class="brand">
+          <label class="check"><input type="checkbox" id="useBrand"> <span data-i18n="useBrand"></span></label>
+          <div class="colors">
+            <label><span data-i18n="primary"></span> <input type="color" id="brandColor" value="#0B3D2E"></label>
+            <label><span data-i18n="accent"></span> <input type="color" id="brandAccent" value="#D4AF37"></label>
+          </div>
+          <div><label for="brandFont" data-i18n="bFont"></label><select id="brandFont"></select></div>
+          <div><label for="logo" data-i18n="lLogo"></label>
+            <div class="photo-row">
+              <input id="logo" type="file" accept="image/*">
+              <button id="clearLogo" class="ghost" data-i18n="clearLogo" hidden></button>
+            </div></div>
+        </div>
+      </details>
+    </aside>
+
+    <section class="work">
+      <div class="bar">
+        <h2 data-i18n="results"></h2>
+        <button id="back" class="ghost" data-i18n="back" disabled></button>
+        <button id="more" data-i18n="more"></button>
+        <label class="check"><input type="checkbox" id="animate"> <span data-i18n="animate"></span></label>
+        <span id="motionCtl" class="sliders">
+          <label><span data-i18n="speed"></span>
+            <input type="range" id="speed" min="0.4" max="2.2" step="0.1" value="0.8"><b id="speedVal"></b></label>
+          <label><span data-i18n="power"></span>
+            <input type="range" id="power" min="0" max="1.8" step="0.1" value="0.3"><b id="powerVal"></b></label>
+          <select id="animPick" class="pick"></select>
+          <select id="bgPick" class="pick"></select>
+        </span>
+      </div>
+      <div id="grid"></div>
+    </section>
   </div>
-
-  <div id="grid"></div>
-
-  <dialog id="zoom">
-    <canvas id="zoomCanvas"></canvas>
-    <div class="actions" id="zoomActions"></div>
-  </dialog>
 
   <section class="explain">
     <h2>ليش هذي الأداة؟</h2>
@@ -111,6 +123,11 @@
       وحتى الخطوط محمّلة من نفس الموقع فما يعرف عن زيارتك أي طرف ثالث.</p>
   </section>
 </main>
+
+<dialog id="zoom">
+  <canvas id="zoomCanvas"></canvas>
+  <div class="actions" id="zoomActions"></div>
+</dialog>
 
 <script src="design.js"></script>
 <script src="app.js"></script>

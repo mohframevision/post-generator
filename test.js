@@ -2,8 +2,8 @@
 const assert = require('assert');
 const { rng, makeSpecs, bestTextOn, luminance, contrastRatio, ensureContrast, brandPalettes,
         logoRect, shade, wrapText, fitLines, coverRect, textLang, pickFont, SCRIM,
-        LAYOUTS, ORNAMENTS, PALETTES, SIZES, TYPES, FONTS, UI,
-        ANIMS, BG_MOTIONS, EASE, DURATIONS, animState, pickAnim, pickBg } = require('./design.js');
+        LAYOUTS, ORNAMENTS, PALETTES, SIZES, TYPES, CATS, FONTS, UI,
+        ANIMS, ANIM_FAMS, BG_MOTIONS, EASE, DURATIONS, animState, pickAnim, pickBg } = require('./design.js');
 
 // نفس البذرة تعطي نفس النتيجة دائماً
 assert.deepStrictEqual([rng(5)(), rng(5)()], [rng(5)(), rng(5)()]);
@@ -31,10 +31,26 @@ for (const O of ORNAMENTS)
 for (const s of SIZES)
   for (const L of ['ar', 'en'])
     assert.ok(s.w > 0 && s.h > 0 && s[L], `مقاس ناقص: ${s.id} (${L})`);
-for (const t of TYPES)
-  for (const L of ['ar', 'en'])
+assert.ok(TYPES.length >= 30, `الأنواع قليلة: ${TYPES.length}`);
+for (const t of TYPES) {
+  assert.ok(CATS.some(c => c.id === t.cat), `نوع بمجموعة مجهولة: ${t.cat}`);
+  for (const L of ['ar', 'en']) {
     assert.ok(t[L] && t[L].name && t[L].t[0] && t[L].t[1] && t[L].s[0],
       `نوع منشور ناقص: ${JSON.stringify(t[L])} (${L})`);
+    // أسماء مختصرة — الاسم الطويل يكسر القائمة الجانبية
+    assert.ok(t[L].name.length <= 22, `اسم نوع طويل (${L}): ${t[L].name}`);
+  }
+}
+// كل مجموعة لازم يكون فيها نوع واحد على الأقل، وإلا تظهر فاضية بالقائمة
+for (const c of CATS) {
+  assert.ok(TYPES.some(t => t.cat === c.id), `مجموعة فاضية: ${c.id}`);
+  for (const L of ['ar', 'en']) assert.ok(c[L], `اسم مجموعة ناقص: ${c.id} (${L})`);
+}
+// أسماء الأنواع فريدة داخل كل لغة، وإلا ما يعرف المستخدم أيهم يختار
+for (const L of ['ar', 'en']) {
+  const names = TYPES.map(t => t[L].name);
+  assert.strictEqual(new Set(names).size, names.length, `اسم نوع مكرر بـ${L}`);
+}
 // أمثلة الأنواع لازم تكون فريدة، وإلا منطق «لا تمسح كتابة المستخدم» يخربط
 const examples = TYPES.flatMap(t => [t.ar.t[1], t.en.t[1]]);
 assert.strictEqual(new Set(examples).size, examples.length, 'مثالان متطابقان بالعنوان');
@@ -197,9 +213,37 @@ for (const a of ANIMS) {
   assert.ok(a.moods.length && a.moods.every(m => MOODS.includes(m)), `حركة بمزاج مجهول: ${a.id}`);
   assert.ok(EASE[a.ease], `حركة بتسارع غير معرّف: ${a.id}`);
 }
-for (const loud of ['slam', 'pop', 'bounce', 'springUp'])
+for (const loud of ['slam', 'pop', 'bounce', 'springUp', 'jelly', 'dropIn', 'hopUp', 'shrinkIn'])
   assert.ok(!ANIMS.find(a => a.id === loud).moods.includes('calm'),
     `الحركة القوية ${loud} وصلت للمواضيع الهادئة`);
+
+// الأقسام: كل حركة تنتمي لقسم معروف، وكل قسم فيه حركات، والأسماء معروضة بلغتين
+assert.ok(ANIMS.length >= 25, `الحركات قليلة: ${ANIMS.length}`);
+for (const a of ANIMS) {
+  assert.ok(ANIM_FAMS.some(f => f.id === a.fam), `حركة بقسم مجهول: ${a.id}`);
+  for (const L of ['ar', 'en']) assert.ok(a[L], `اسم حركة ناقص: ${a.id} (${L})`);
+}
+for (const f of ANIM_FAMS) {
+  assert.ok(ANIMS.some(a => a.fam === f.id), `قسم حركات فارغ: ${f.id}`);
+  for (const L of ['ar', 'en']) assert.ok(f[L], `اسم قسم ناقص: ${f.id} (${L})`);
+}
+for (const b of BG_MOTIONS)
+  for (const L of ['ar', 'en']) assert.ok(b[L], `اسم حركة خلفية ناقص: ${b.id} (${L})`);
+// المعرّفات فريدة، وإلا الاختيار اليدوي يجيب الغلط
+for (const [name, list] of [['حركة', ANIMS], ['خلفية', BG_MOTIONS], ['قسم', ANIM_FAMS]])
+  assert.strictEqual(new Set(list.map(x => x.id)).size, list.length, `معرّف ${name} مكرر`);
+
+// الاختيار اليدوي يتقدّم على المزاج، والفارغ يرجع للتلقائي
+const anySpec = makeSpecs(3)[0];
+for (const a of ANIMS)
+  for (const mood of MOODS)
+    assert.strictEqual(pickAnim(anySpec, mood, a.id).id, a.id,
+      `الاختيار اليدوي ${a.id} ما طُبّق بمزاج ${mood}`);
+for (const b of BG_MOTIONS)
+  assert.strictEqual(pickBg(anySpec, 'calm', b.id).id, b.id, `خلفية ${b.id} ما طُبّقت`);
+assert.ok(byMoodHas(pickAnim(anySpec, 'calm', null), 'calm'), 'الفارغ ما رجع للتلقائي');
+assert.ok(byMoodHas(pickAnim(anySpec, 'calm', 'لا-يوجد'), 'calm'), 'معرّف مجهول ما رجع للتلقائي');
+function byMoodHas(a, m) { return a.moods.includes(m); }
 
 // التسارع: يبدأ من ٠ وينتهي بـ١ (والارتداد يزيد بالنص، وهذا مقصود)
 for (const [id, fn] of Object.entries(EASE)) {
@@ -360,12 +404,17 @@ for (const p of pages) {
                     'back', 'more', 'zoom', 'zoomCanvas', 'zoomActions', 'photo', 'logo',
                     'clearPhoto', 'clearLogo', 'useBrand', 'brandColor', 'brandAccent',
                     'brandBox', 'titleLabel', 'subLabel', 'animate',
-                    'speed', 'power', 'speedVal', 'powerVal', 'motionCtl'])
+                    'speed', 'power', 'speedVal', 'powerVal', 'motionCtl',
+                    'typeSearch', 'typeNote', 'animPick', 'bgPick'])
     assert.ok(html.includes(`id="${id}"`), `${p.file}: ناقص العنصر ${id}`);
 
   // كل مفتاح نص بالصفحة موجود بجدول النصوص
-  for (const m of html.matchAll(/data-i18n="([^"]+)"/g))
+  for (const m of html.matchAll(/data-i18n(?:-ph)?="([^"]+)"/g))
     assert.ok(UI[p.lang][m[1]], `${p.file}: مفتاح نص غير معرّف ${m[1]}`);
+
+  // هيكل العمودين لازم يكون موجوداً بالصفحتين
+  for (const cls of ['class="top"', 'class="app"', 'class="side"', 'class="work"'])
+    assert.ok(html.includes(cls), `${p.file}: ناقص ${cls} — الواجهة ما تملأ الشاشة`);
 
   // الافتراضي بالصفحة لازم يطابق الافتراضي بالكود، وإلا تقفز المزالج أول تحميل
   const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');

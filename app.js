@@ -25,6 +25,8 @@ const fields = () => ({
   image, logo, lang: postLang(),
   mood: TYPES[typeEl.value || 0].mood,   // الحركة تتبع مزاج نوع المنشور
   power: +powerEl.value,                  // وشدّتها يضبطها المستخدم
+  animId: animPick.value || null,         // واختياره اليدوي يتقدّم على المزاج
+  bgId: bgPick.value || null,
 });
 const size = () => SIZES[sizeEl.value];
 
@@ -43,7 +45,8 @@ themeBtn.onclick = () => {
 function paintUI() {
   const t = T();
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t[el.dataset.i18n]);
-  TYPES.forEach((x, i) => typeEl.add(new Option(x[ui].name, i)));
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t[el.dataset.i18nPh]);
+  fillTypes();
   SIZES.forEach((x, i) => sizeEl.add(new Option(x[ui], i)));
   brandFont.add(new Option(t.autoFont, ''));
   for (const key of ['ar', 'en']) {
@@ -55,7 +58,43 @@ function paintUI() {
   paintTheme();
 }
 
-// ===== نوع المنشور =====
+// ===== نوع المنشور: مجموعات + بحث =====
+// القائمة مبنية بـoptgroup لأن الأنواع كثيرة، والبحث يعيد بناءها بالمطابقات فقط
+const searchEl = document.getElementById('typeSearch');
+const noteEl = document.getElementById('typeNote');
+
+function fillTypes(q = '') {
+  const keep = typeEl.value;
+  const needle = q.trim().toLowerCase();
+  const hit = i => !needle ||
+    [TYPES[i].ar.name, TYPES[i].en.name, TYPES[i].ar.t[1], TYPES[i].en.t[1],
+     CATS.find(c => c.id === TYPES[i].cat)[ui]].join(' ').toLowerCase().includes(needle);
+
+  typeEl.innerHTML = '';
+  for (const cat of CATS) {
+    const hits = [...TYPES.entries()].filter(([i, t]) => t.cat === cat.id && hit(i));
+    if (!hits.length) continue;
+    const g = document.createElement('optgroup');
+    g.label = cat[ui];
+    hits.forEach(([i, t]) => g.appendChild(new Option(t[ui].name, i)));
+    typeEl.appendChild(g);
+  }
+  if (!typeEl.options.length) {  // ما فيه مطابقة — نرجّع الكل ونقول له، لا نتجاهل بصمت
+    fillTypes('');               // ينظّف الملاحظة، فنضعها بعده لا قبله
+    noteEl.textContent = T().noTypes;
+    noteEl.hidden = false;
+    return;
+  }
+  noteEl.hidden = true;
+  typeEl.value = [...typeEl.options].some(o => o.value === keep) ? keep : typeEl.options[0].value;
+}
+
+searchEl.addEventListener('input', () => {
+  const before = typeEl.value;
+  fillTypes(searchEl.value);
+  if (typeEl.value !== before) applyType();
+});
+
 function applyType() {
   const t = TYPES[typeEl.value][ui];
   document.getElementById('titleLabel').textContent = t.t[0];
@@ -141,6 +180,29 @@ function tick(now) {
 }
 requestAnimationFrame(tick);
 
+// قائمتا اختيار الحركة، مقسّمتان لعائلات — نفس نمط قائمة أنواع المنشورات
+const animPick = document.getElementById('animPick');
+const bgPick = document.getElementById('bgPick');
+
+function fillMotionPicks() {
+  const t = T();
+  animPick.innerHTML = ''; bgPick.innerHTML = '';
+  animPick.add(new Option(t.autoAnim, ''));
+  for (const fam of ANIM_FAMS) {
+    const g = document.createElement('optgroup');
+    g.label = fam[ui];
+    ANIMS.filter(a => a.fam === fam.id).forEach(a => g.appendChild(new Option(a[ui], a.id)));
+    animPick.appendChild(g);
+  }
+  bgPick.add(new Option(t.autoAnim, ''));
+  BG_MOTIONS.forEach(b => bgPick.add(new Option(b[ui], b.id)));
+  animPick.title = t.lAnim; bgPick.title = t.lBg;
+}
+[animPick, bgPick].forEach(el => el.addEventListener('change', () => {
+  localStorage.setItem(el.id, el.value);
+  render();
+}));
+
 function paintMotion() {
   motionCtl.hidden = !animBox.checked;
   document.getElementById('speedVal').textContent = (+speedEl.value).toFixed(1) + '×';
@@ -165,6 +227,9 @@ animBox.checked = (localStorage.getItem('anim') ?? (stillMotion ? '0' : '1')) ==
 const MOTION_DEFAULTS = { speed: '0.8', power: '0.3' };
 speedEl.value = localStorage.getItem('motionSpeed') ?? MOTION_DEFAULTS.speed;
 powerEl.value = localStorage.getItem('motionPower') ?? MOTION_DEFAULTS.power;
+fillMotionPicks();
+animPick.value = localStorage.getItem('animPick') ?? '';
+bgPick.value = localStorage.getItem('bgPick') ?? '';
 paintMotion();
 
 // ننزّل خطوط هذي المجموعة فقط — عندنا ٣٢ عائلة، تحميلها كلها يقتل جوال بشريحة
