@@ -273,6 +273,8 @@ const UI = {
     speed: 'السرعة', power: 'الشدة',
     searchTypes: 'ابحث عن نوع…', noTypes: 'ما فيه نوع بهذا الاسم', results: 'التصاميم',
     lAnim: 'حركة النص', lBg: 'حركة الخلفية', autoAnim: 'تلقائي — حسب نوع المنشور',
+    presets: 'جاهز:', lLogoPos: 'موضع الشعار', lScrim: 'تعتيم الصورة',
+    lGrad: 'خلفية متدرّجة (بلا صورة)', noGrad: 'تلقائي — ألوان متنوّعة', logoTooBig: 'الشعار كبير، فما انحفظ للمرة الجاية. صغّره لو تبيه يبقى.',
   },
   en: {
     dir: 'ltr', lang: 'en', other: 'العربية', pageTitle: 'Free Instagram Post Maker — no design skills',
@@ -292,6 +294,8 @@ const UI = {
     speed: 'Speed', power: 'Strength',
     searchTypes: 'Search post types…', noTypes: 'No type matches that', results: 'Designs',
     lAnim: 'Text motion', lBg: 'Background motion', autoAnim: 'Automatic — follows post type',
+    presets: 'Quick:', lLogoPos: 'Logo position', lScrim: 'Photo dimming',
+    lGrad: 'Gradient background (no photo)', noGrad: 'Automatic — varied colours', logoTooBig: 'Logo too large to save for next time. Use a smaller file to keep it.',
   },
 };
 
@@ -560,8 +564,39 @@ function logoRect(lw, lh, W) {
   return { w, h };
 }
 
-// كثافة الطبقة فوق الصورة: تكفي عشان النص يبان مهما كانت الصورة فاتحة أو غامقة
+// كثافة الطبقة فوق الصورة. ٠٫٧ هي القيمة التي تضمن وضوح النص فوق أي صورة،
+// والمستخدم يقدر ينزّلها بالمزلاج — تحت ٠٫٦ الصور الفاتحة تبدأ تبلع النص.
 const SCRIM = 0.7;
+
+// تدرّجات جاهزة للخلفية حين لا توجد صورة. كل واحد يحمل ألوان نصّه معه.
+const GRADIENTS = [
+  { id: 'navy', ar: 'كحلي عميق', en: 'Deep navy', grad: ['#0B1E3A', '#1D4A87'], bg: '#0F2A50', fg: '#F2F6FF', ac: '#FFC857' },
+  { id: 'sunset', ar: 'غروب دافئ', en: 'Warm sunset', grad: ['#5E2020', '#B4562A'], bg: '#8A3A24', fg: '#FFF6EC', ac: '#FFD9A0' },
+  { id: 'charcoal', ar: 'فحمي', en: 'Dark charcoal', grad: ['#121212', '#333333'], bg: '#1F1F1F', fg: '#F2F2F2', ac: '#E0B15C' },
+  { id: 'cream', ar: 'كريمي ناعم', en: 'Soft cream', grad: ['#FFF8EE', '#EFDFC6'], bg: '#F8F0E1', fg: '#3A2E22', ac: '#9C6B2E' },
+  { id: 'forest', ar: 'أخضر غابة', en: 'Forest', grad: ['#0C2A22', '#1E5945'], bg: '#153B30', fg: '#EAF6F0', ac: '#F0C674' },
+  { id: 'plum', ar: 'بنفسجي', en: 'Plum', grad: ['#2A1235', '#5C2A6B'], bg: '#3E1C4D', fg: '#F8EDFB', ac: '#F2B5D4' },
+  { id: 'steel', ar: 'رمادي فولاذي', en: 'Steel', grad: ['#1B2430', '#3C4A5A'], bg: '#28323F', fg: '#EDF1F5', ac: '#8FC1E3' },
+  { id: 'rose', ar: 'وردي فاتح', en: 'Soft rose', grad: ['#FFF4F6', '#F3D3DA'], bg: '#FBE7EB', fg: '#4A2029', ac: '#A63B4D' },
+];
+
+// مواضع الشعار الخمسة — الإزاحة نسبة من المقاس
+const LOGO_POS = [
+  { id: '', ar: 'تلقائي — مع اسم المحل', en: 'Automatic — with the name' },
+  { id: 'tr', ar: 'أعلى اليمين', en: 'Top right' },
+  { id: 'tl', ar: 'أعلى اليسار', en: 'Top left' },
+  { id: 'c', ar: 'الوسط', en: 'Center' },
+  { id: 'br', ar: 'أسفل اليمين', en: 'Bottom right' },
+  { id: 'bl', ar: 'أسفل اليسار', en: 'Bottom left' },
+];
+
+// يحسب ركن الشعار. m الهامش نسبة من أصغر بُعد.
+function logoAt(pos, W, H, w, h) {
+  const m = Math.min(W, H) * 0.07;
+  const x = pos[1] === 'r' || pos === 'tr' || pos === 'br' ? W - m - w : m;
+  if (pos === 'c') return { x: (W - w) / 2, y: (H - h) / 2 };
+  return { x, y: pos[0] === 't' ? m : H - m - h };
+}
 
 // يقسّم النص إلى أسطر تناسب العرض. measure دالة تقيس عرض النص.
 function wrapText(text, maxW, measure) {
@@ -612,12 +647,17 @@ function drawPost(ctx, W, H, spec, f, t = null) {
       W, H, M.zoom || 1, M.panX || 0);
     ctx.drawImage(f.image, r.x, r.y, r.w, r.h);
     // طبقة بلون اللوحة فوق الصورة — بدونها النص يضيع بالصور الفاتحة
-    ctx.globalAlpha = SCRIM;
+    ctx.globalAlpha = f.scrim === undefined ? SCRIM : f.scrim;
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
     ctx.globalAlpha = 1;
   } else {
-    if (spec.backdrop === 'gradient') {
+    if (spec.palette.grad) {                 // تدرّج اختاره المستخدم
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, spec.palette.grad[0]);
+      g.addColorStop(1, spec.palette.grad[1]);
+      ctx.fillStyle = g;
+    } else if (spec.backdrop === 'gradient') {
       const g = ctx.createLinearGradient(0, 0, W, H);
       g.addColorStop(0, shade(bg, luminance(bg) > 0.5 ? -0.08 : 0.12));
       g.addColorStop(1, bg);
@@ -865,20 +905,22 @@ function moveTo(g, tf, cx, cy) {
 }
 
 // توقيع المحل أسفل التصميم: شعاره لو رفع واحداً، وإلا شريط باسمه
-function mark(ctx, f, W, { tf, color, textColor, cx, y, family }) {
+function mark(ctx, f, W, H, { tf, color, textColor, cx, y, family }) {
   // نفس السبب: الشريط والاسم فوقه، لو رُسما بشفافية جزئية بان الشريط من خلف الحروف
   paintLayer(ctx, tf ? tf.a : 1, g => {
     g.save();
     if (tf) moveTo(g, tf, cx, y);
-    drawMark(g, f, W, { color, textColor, cx, y, family });
+    drawMark(g, f, W, H, { color, textColor, cx, y, family });
     g.restore();
   });
 }
 
-function drawMark(ctx, f, W, { color, textColor, cx, y, family }) {
+function drawMark(ctx, f, W, H, { color, textColor, cx, y, family }) {
   if (f.logo) {
     const { w, h } = logoRect(f.logo.naturalWidth || f.logo.width, f.logo.naturalHeight || f.logo.height, W);
-    ctx.drawImage(f.logo, cx - w / 2, y, w, h);
+    // موضع مختار من المستخدم يتقدّم على موضع التخطيط
+    const at = f.logoPos ? logoAt(f.logoPos, W, H, w, h) : { x: cx - w / 2, y };
+    ctx.drawImage(f.logo, at.x, at.y, w, h);
     return;
   }
   if (!f.name || !f.name.trim()) return;
@@ -906,7 +948,7 @@ const LAYOUT_FN = {
     const top = H * 0.46 - (h1 + (h2 ? W * 0.04 + h2 : 0)) / 2;
     block(ctx, f.title, { tf: g.tf(0), ...T, y: top });
     block(ctx, f.sub, { tf: g.tf(1), ...B, y: top + h1 + W * 0.04 });
-    mark(ctx, f, W, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.84, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.84, family: bf });
   },
   frame(ctx, W, H, spec, f, g) {
     const M = Math.min(W, H), I = M * 0.06;
@@ -924,7 +966,7 @@ const LAYOUT_FN = {
     const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
     block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.47 - h1 / 2 });
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.72, color: fg, align: 'center', x: W / 2, y: H * 0.7 });
-    mark(ctx, f, W, { tf: g.tf(2), color: ac, textColor: on, cx: W / 2, y: H * 0.85, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: on, cx: W / 2, y: H * 0.85, family: bf });
   },
   topSplit(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -935,7 +977,7 @@ const LAYOUT_FN = {
     const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
     block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.23 - h1 / 2 });
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.06, maxLines: 3, maxW: W * 0.76, color: fg, align: 'center', x: W / 2, y: H * 0.58 });
-    mark(ctx, f, W, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.85, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.85, family: bf });
   },
   corner(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -944,7 +986,7 @@ const LAYOUT_FN = {
     const x = g.px(W * 0.82), maxW = W * 0.72;
     const h1 = block(ctx, f.title, { tf: g.tf(0), family: df, weight: dw, maxSize: W * 0.13, maxLines: 3, maxW, color: fg, align: g.align, x, y: H * 0.16 });
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 3, maxW, color: ac, align: g.align, x, y: H * 0.16 + h1 + W * 0.05 });
-    mark(ctx, f, W, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
   },
   stack(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -953,7 +995,7 @@ const LAYOUT_FN = {
     ctx.fillStyle = ac;
     ctx.fillRect(g.rx(W * 0.14, W * 0.24), H * 0.66, W * 0.24, H * 0.012);
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW, color: ac, align: g.align, x, y: H * 0.71 });
-    mark(ctx, f, W, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.86, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.86, family: bf });
   },
   bottomBand(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -964,7 +1006,7 @@ const LAYOUT_FN = {
     const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
     block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.34 - h1 / 2 });
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.78, color: on, align: 'center', x: W / 2, y: H * 0.75 });
-    mark(ctx, f, W, { tf: g.tf(2), color: on, textColor: ac, cx: W / 2, y: H * 0.9, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: on, textColor: ac, cx: W / 2, y: H * 0.9, family: bf });
   },
   boxed(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -977,7 +1019,7 @@ const LAYOUT_FN = {
     const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
     block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.44 - h1 / 2 });
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.76, color: fg, align: 'center', x: W / 2, y: H * 0.72 });
-    mark(ctx, f, W, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.87, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.87, family: bf });
   },
   duo(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -988,7 +1030,7 @@ const LAYOUT_FN = {
     const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
     block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.28 - h1 / 2 });
     block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.06, maxLines: 3, maxW: W * 0.78, color: on, align: 'center', x: W / 2, y: H * 0.64 });
-    mark(ctx, f, W, { tf: g.tf(2), color: on, textColor: ac, cx: W / 2, y: H * 0.88, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: on, textColor: ac, cx: W / 2, y: H * 0.88, family: bf });
   },
   sideBar(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -1002,7 +1044,7 @@ const LAYOUT_FN = {
     const top = H * 0.44 - (h1 + (h2 ? W * 0.04 + h2 : 0)) / 2;
     block(ctx, f.title, { tf: g.tf(0), ...T, y: top });
     block(ctx, f.sub, { tf: g.tf(1), ...B, y: top + h1 + W * 0.04 });
-    mark(ctx, f, W, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx, y: H * 0.85, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx, y: H * 0.85, family: bf });
   },
   outline(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -1013,13 +1055,13 @@ const LAYOUT_FN = {
     const top = H * 0.45 - (h1 + (h2 ? W * 0.05 + h2 : 0)) / 2;
     block(ctx, f.title, { tf: g.tf(0), ...T, y: top });
     block(ctx, f.sub, { tf: g.tf(1), ...B, y: top + h1 + W * 0.05 });
-    mark(ctx, f, W, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
+    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
   },
 };
 
 if (typeof module !== 'undefined') module.exports = {
   rng, makeSpecs, luminance, bestTextOn, contrastRatio, ensureContrast, brandPalettes,
   logoRect, shade, wrapText, fitLines, coverRect, textLang, pickFont, SCRIM,
-  PALETTES, LAYOUTS, ORNAMENTS, FONTS, SIZES, TYPES, CATS, UI,
+  PALETTES, LAYOUTS, ORNAMENTS, FONTS, SIZES, TYPES, CATS, UI, GRADIENTS, LOGO_POS, logoAt,
   ANIMS, ANIM_FAMS, BG_MOTIONS, EASE, DURATIONS, animState, pickAnim, pickBg, ornMotion,
 };

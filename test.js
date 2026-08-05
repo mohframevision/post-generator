@@ -2,7 +2,7 @@
 const assert = require('assert');
 const { rng, makeSpecs, bestTextOn, luminance, contrastRatio, ensureContrast, brandPalettes,
         logoRect, shade, wrapText, fitLines, coverRect, textLang, pickFont, SCRIM,
-        LAYOUTS, ORNAMENTS, PALETTES, SIZES, TYPES, CATS, FONTS, UI,
+        LAYOUTS, ORNAMENTS, PALETTES, SIZES, TYPES, CATS, FONTS, UI, GRADIENTS, LOGO_POS, logoAt,
         ANIMS, ANIM_FAMS, BG_MOTIONS, EASE, DURATIONS, animState, pickAnim, pickBg } = require('./design.js');
 
 // نفس البذرة تعطي نفس النتيجة دائماً
@@ -198,6 +198,31 @@ const at = s => JSON.stringify(makeSpecs((1000 + s * 7919) >>> 0));
 assert.strictEqual(at(3), at(3));
 assert.notStrictEqual(at(3), at(4));
 assert.strictEqual(at(2), at(3 - 1), 'الرجوع خطوة ما رجّع نفس المجموعة');
+
+// ===== التدرّجات ومواضع الشعار =====
+// كل تدرّج يحمل ألوان نصّه، فلازم تنجح بنفس شروط اللوحات
+for (const g of GRADIENTS) {
+  for (const L of ['ar', 'en']) assert.ok(g[L], `اسم تدرّج ناقص: ${g.id} (${L})`);
+  assert.strictEqual(g.grad.length, 2, `تدرّج ${g.id} ما له لونان`);
+  assert.ok(contrast(g.fg, g.bg) >= 4.5, `تدرّج ${g.id}: النص ما يبان على لونه الأساسي`);
+  for (const stop of g.grad)
+    assert.ok(contrast(g.fg, stop) >= 4, `تدرّج ${g.id}: النص ما يبان عند الطرف ${stop}`);
+  assert.ok(contrast(bestTextOn(g.ac), g.ac) >= 3, `تدرّج ${g.id}: لون مميّز ما يبان`);
+}
+assert.strictEqual(new Set(GRADIENTS.map(g => g.id)).size, GRADIENTS.length, 'معرّف تدرّج مكرر');
+
+// مواضع الشعار: كلّها داخل حدود التصميم ولا واحد يتداخل مع الآخر
+for (const { w: W, h: H } of SIZES)
+  for (const p of LOGO_POS.filter(p => p.id)) {
+    const lw = W * 0.3, lh = W * 0.11;
+    const at = logoAt(p.id, W, H, lw, lh);
+    assert.ok(at.x >= 0 && at.y >= 0 && at.x + lw <= W && at.y + lh <= H,
+      `موضع ${p.id} بمقاس ${W}x${H} يطلّع الشعار برّا`);
+  }
+// والخمسة مواضع مختلفة فعلاً
+const spots = LOGO_POS.filter(p => p.id).map(p => JSON.stringify(logoAt(p.id, 1080, 1080, 300, 120)));
+assert.strictEqual(new Set(spots).size, 5, 'موضعان للشعار متطابقان');
+for (const L of ['ar', 'en']) LOGO_POS.forEach(p => assert.ok(p[L], `اسم موضع ناقص (${L})`));
 
 // ===== الحركة =====
 const MOODS = [...new Set(TYPES.map(t => t.mood))];
@@ -405,7 +430,8 @@ for (const p of pages) {
                     'clearPhoto', 'clearLogo', 'useBrand', 'brandColor', 'brandAccent',
                     'brandBox', 'titleLabel', 'subLabel', 'animate',
                     'speed', 'power', 'speedVal', 'powerVal', 'motionCtl',
-                    'typeSearch', 'typeNote', 'animPick', 'bgPick'])
+                    'typeSearch', 'typeNote', 'animPick', 'bgPick',
+                    'chips', 'logoPos', 'scrim', 'scrimVal', 'grad'])
     assert.ok(html.includes(`id="${id}"`), `${p.file}: ناقص العنصر ${id}`);
 
   // كل مفتاح نص بالصفحة موجود بجدول النصوص

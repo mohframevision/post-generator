@@ -27,7 +27,15 @@ const fields = () => ({
   power: +powerEl.value,                  // وشدّتها يضبطها المستخدم
   animId: animPick.value || null,         // واختياره اليدوي يتقدّم على المزاج
   bgId: bgPick.value || null,
+  logoPos: logoPosEl.value || null,
+  scrim: +scrimEl.value / 100,
 });
+
+// تدرّج اختاره المستخدم يستبدل لوحة ألوان التصميم كاملةً — الألوان تجي معه
+const applyGrad = spec => {
+  const g = gradEl.value && GRADIENTS.find(x => x.id === gradEl.value);
+  return g ? { ...spec, palette: { bg: g.bg, fg: g.fg, ac: g.ac, grad: g.grad } } : spec;
+};
 const size = () => SIZES[sizeEl.value];
 
 // ===== الثيم =====
@@ -47,6 +55,8 @@ function paintUI() {
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t[el.dataset.i18n]);
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t[el.dataset.i18nPh]);
   fillTypes();
+  fillExtras();
+  fillChips();
   SIZES.forEach((x, i) => sizeEl.add(new Option(x[ui], i)));
   brandFont.add(new Option(t.autoFont, ''));
   for (const key of ['ar', 'en']) {
@@ -56,6 +66,52 @@ function paintUI() {
     brandFont.appendChild(grp);
   }
   paintTheme();
+}
+
+// ===== ضوابط الصورة والشعار والتدرّج =====
+const logoPosEl = document.getElementById('logoPos');
+const scrimEl = document.getElementById('scrim');
+const gradEl = document.getElementById('grad');
+
+function fillExtras() {
+  const t = T();
+  logoPosEl.innerHTML = ''; gradEl.innerHTML = '';
+  LOGO_POS.forEach(p => logoPosEl.add(new Option(p[ui], p.id)));
+  gradEl.add(new Option(t.noGrad, ''));
+  GRADIENTS.forEach(g => gradEl.add(new Option(g[ui], g.id)));
+}
+const paintScrim = () => document.getElementById('scrimVal').textContent = scrimEl.value + '٪';
+[logoPosEl, gradEl].forEach(el => el.addEventListener('change', () => {
+  localStorage.setItem(el.id, el.value); render();
+}));
+scrimEl.addEventListener('input', () => {
+  localStorage.setItem('scrim', scrimEl.value); paintScrim(); render();
+});
+
+// ===== رقائق سريعة: تختار نوعاً جاهزاً بضغطة بدل فتح القائمة =====
+// ponytail: تشير للأنواع الموجودة لا لنصوص جديدة — مصدر واحد للأمثلة.
+const QUICK = ['خصم', 'مواعيد الدوام', 'قريباً'];
+
+function fillChips() {
+  const box = document.getElementById('chips');
+  box.innerHTML = '';
+  const lbl = document.createElement('span');
+  lbl.className = 'hint'; lbl.textContent = T().presets;
+  box.appendChild(lbl);
+  for (const arName of QUICK) {
+    const i = TYPES.findIndex(x => x.ar.name === arName);
+    if (i < 0) continue;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = TYPES[i][ui].name;
+    b.onclick = () => {
+      searchEl.value = ''; fillTypes();
+      typeEl.value = String(i);
+      titleEl.value = ''; subEl.value = '';   // نفرّغها ليحطّ المثال الجاهز
+      applyType();
+      loadFonts().then(render);
+    };
+    box.appendChild(b);
+  }
 }
 
 // ===== نوع المنشور: مجموعات + بحث =====
@@ -128,7 +184,7 @@ function render() {
   const pw = 440, ph = Math.round(pw * sz.h / sz.w);
   grid.innerHTML = '';
   live = [];
-  specs.map(applyFont).forEach(spec => {
+  specs.map(applyFont).map(applyGrad).forEach(spec => {
     const card = document.createElement('div');
     card.className = 'card';
     const c = document.createElement('canvas');
@@ -232,11 +288,22 @@ animPick.value = localStorage.getItem('animPick') ?? '';
 bgPick.value = localStorage.getItem('bgPick') ?? '';
 paintMotion();
 
+// كل اختيارات المستخدم ترجع كما تركها.
+// لازم تُستدعى بعد paintUI لأن ضبط قيمة قائمة قبل بناء خياراتها يضيع بصمت.
+function loadExtras() {
+  logoPosEl.value = localStorage.getItem('logoPos') ?? '';
+  gradEl.value = localStorage.getItem('grad') ?? '';
+  scrimEl.value = localStorage.getItem('scrim') ?? '40';
+  paintScrim();
+  const savedLogo = localStorage.getItem('logo');
+  if (savedLogo) useLogo(savedLogo, false);
+}
+
 // ننزّل خطوط هذي المجموعة فقط — عندنا ٣٢ عائلة، تحميلها كلها يقتل جوال بشريحة
 function loadFonts() {
   const f = fields();
   const text = (f.title + f.sub + f.name) || 'Aa';
-  const jobs = specs.map(applyFont).flatMap(s => {
+  const jobs = specs.map(applyFont).map(applyGrad).flatMap(s => {
     const [df, dw, bf, bw] = pickFont(s, f.lang);
     return [`${dw} 100px "${df}"`, `${bw} 100px "${bf}"`];
   });
@@ -282,7 +349,7 @@ zoomDlg.addEventListener('close', () => { live = live.filter(L => !L.zoom); });
 function toBlob(spec) {
   const sz = size(), c = document.createElement('canvas');
   c.width = sz.w; c.height = sz.h;
-  drawPost(c.getContext('2d'), sz.w, sz.h, applyFont(spec), fields());
+  drawPost(c.getContext('2d'), sz.w, sz.h, applyGrad(applyFont(spec)), fields());
   return new Promise(res => c.toBlob(res, 'image/png'));
 }
 
@@ -381,18 +448,38 @@ brandFont.addEventListener('change', () => { render(); loadFonts().then(render);
 
 const logoInput = document.getElementById('logo');
 const clearLogo = document.getElementById('clearLogo');
+// الشعار يُحفظ كصورة داخل المتصفح ليبقى بعد إغلاق الصفحة.
+// ponytail: حدّ ٧٠٠ كيلوبايت — حصة التخزين ~٥ ميجابايت والصورة تكبر ٣٣٪ بالترميز.
+// لو صار الناس يرفعون شعارات ضخمة، ننزّل المقاس قبل الحفظ بدل الرفض.
+const LOGO_MAX = 700 * 1024;
+
+function useLogo(src, save) {
+  const img = new Image();
+  img.onload = () => {
+    logo = img; clearLogo.hidden = false; render();
+    if (!save) return;
+    try { localStorage.setItem('logo', src); }
+    catch { localStorage.removeItem('logo'); alert(T().logoTooBig); }
+  };
+  img.onerror = () => { if (save) alert(T().badImage); else localStorage.removeItem('logo'); };
+  img.src = src;
+}
+
 logoInput.addEventListener('change', () => {
   const file = logoInput.files[0];
   if (!file) return;
-  if (logo) URL.revokeObjectURL(logo.src);
-  const img = new Image();
-  img.onload = () => { logo = img; clearLogo.hidden = false; render(); };
-  img.onerror = () => alert(T().badImage);
-  img.src = URL.createObjectURL(file);
+  const r = new FileReader();
+  r.onload = () => {
+    const src = r.result;
+    if (src.length > LOGO_MAX) { useLogo(src, false); alert(T().logoTooBig); }
+    else useLogo(src, true);
+  };
+  r.onerror = () => alert(T().badImage);
+  r.readAsDataURL(file);
 });
 clearLogo.onclick = () => {
-  if (logo) URL.revokeObjectURL(logo.src);
-  logo = null; logoInput.value = ''; clearLogo.hidden = true; render();
+  logo = null; logoInput.value = ''; clearLogo.hidden = true;
+  localStorage.removeItem('logo'); render();
 };
 
 // إعدادات العلامة تنحفظ بالمتصفح — يضبطها مرة وحدة وخلاص (الشعار ما ينحفظ)
@@ -438,5 +525,6 @@ nameEl.addEventListener('input', () => localStorage.setItem('shopName', nameEl.v
 
 paintUI();
 loadBrand();
+loadExtras();
 applyType();
 build();

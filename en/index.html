@@ -44,7 +44,8 @@
             <span id="typeNote" class="hint" hidden></span></div>
           <div><label for="size" data-i18n="lSize"></label><select id="size"></select></div>
           <div><label for="title" id="titleLabel"></label>
-            <input id="title" maxlength="70" autocomplete="off"></div>
+            <input id="title" maxlength="70" autocomplete="off">
+            <div id="chips" class="chips"></div></div>
           <div><label for="sub" id="subLabel"></label>
             <textarea id="sub" rows="2" maxlength="140"></textarea></div>
           <div><label for="name" data-i18n="lName"></label>
@@ -54,6 +55,9 @@
               <input id="photo" type="file" accept="image/*">
               <button id="clearPhoto" class="ghost" data-i18n="clearPhoto" hidden></button>
             </div></div>
+          <div><label for="scrim" data-i18n="lScrim"></label>
+            <div class="row"><input type="range" id="scrim" min="0" max="90" step="5" value="40"><b id="scrimVal"></b></div></div>
+          <div><label for="grad" data-i18n="lGrad"></label><select id="grad"></select></div>
         </div>
       </div>
 
@@ -66,6 +70,7 @@
             <label><span data-i18n="accent"></span> <input type="color" id="brandAccent" value="#D4AF37"></label>
           </div>
           <div><label for="brandFont" data-i18n="bFont"></label><select id="brandFont"></select></div>
+          <div><label for="logoPos" data-i18n="lLogoPos"></label><select id="logoPos"></select></div>
           <div><label for="logo" data-i18n="lLogo"></label>
             <div class="photo-row">
               <input id="logo" type="file" accept="image/*">
