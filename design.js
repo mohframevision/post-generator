@@ -275,6 +275,8 @@ const UI = {
     lAnim: 'حركة النص', lBg: 'حركة الخلفية', autoAnim: 'تلقائي — حسب نوع المنشور',
     presets: 'جاهز:', lLogoPos: 'موضع الشعار', lScrim: 'تعتيم الصورة',
     lGrad: 'خلفية متدرّجة (بلا صورة)', noGrad: 'تلقائي — ألوان متنوّعة', logoTooBig: 'الشعار كبير، فما انحفظ للمرة الجاية. صغّره لو تبيه يبقى.',
+    lTextSize: 'حجم النص', copy: '⧉ الوصف', copied: 'انتسخ الوصف — الصقه بإنستقرام',
+    copyFailed: 'ما قدرنا ننسخ. انسخ النص يدوياً.', showcase: 'أمثلة من الأداة',
   },
   en: {
     dir: 'ltr', lang: 'en', other: 'العربية', pageTitle: 'Free Instagram Post Maker — no design skills',
@@ -296,6 +298,8 @@ const UI = {
     lAnim: 'Text motion', lBg: 'Background motion', autoAnim: 'Automatic — follows post type',
     presets: 'Quick:', lLogoPos: 'Logo position', lScrim: 'Photo dimming',
     lGrad: 'Gradient background (no photo)', noGrad: 'Automatic — varied colours', logoTooBig: 'Logo too large to save for next time. Use a smaller file to keep it.',
+    lTextSize: 'Text size', copy: '⧉ Caption', copied: 'Caption copied — paste it into Instagram',
+    copyFailed: 'Could not copy. Select the text manually.', showcase: 'Made with this tool',
   },
 };
 
@@ -580,6 +584,40 @@ const GRADIENTS = [
   { id: 'rose', ar: 'وردي فاتح', en: 'Soft rose', grad: ['#FFF4F6', '#F3D3DA'], bg: '#FBE7EB', fg: '#4A2029', ac: '#A63B4D' },
 ];
 
+// اسم ملف فريد: المقاس + نوع المنشور + الوقت بالثانية.
+// تنزيل عشرة ملفات ما يتعارض، والاسم يقول وش فيه بلا ما تفتحه.
+function postFileName(typeEn, sizeId, ext, date = new Date()) {
+  const slug = (typeEn || 'post').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const p = n => String(n).padStart(2, '0');
+  const stamp = `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}` +
+                `_${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
+  return `${sizeId}-${slug || 'post'}-${stamp}.${ext}`;
+}
+
+// وسوم جاهزة لكل مجموعة — تُنسخ مع النصّ بزرّ «انسخ الوصف»
+const TAGS = {
+  offers: { ar: ['عروض', 'خصومات', 'تخفيضات', 'البحرين'], en: ['offers', 'sale', 'discount', 'bahrain'] },
+  store: { ar: ['وصل_حديثاً', 'تشكيلة_جديدة', 'تسوق', 'البحرين'], en: ['newarrival', 'newcollection', 'shopping', 'bahrain'] },
+  food: { ar: ['مطاعم', 'مقاهي', 'أكل', 'البحرين'], en: ['food', 'cafe', 'restaurant', 'bahrain'] },
+  services: { ar: ['خدمات', 'مواعيد', 'حجز', 'البحرين'], en: ['services', 'booking', 'openinghours', 'bahrain'] },
+  events: { ar: ['مناسبات', 'فعاليات', 'افتتاح', 'البحرين'], en: ['events', 'grandopening', 'celebration', 'bahrain'] },
+  jobs: { ar: ['وظائف', 'توظيف', 'فرص_عمل', 'البحرين'], en: ['jobs', 'hiring', 'careers', 'bahrain'] },
+  content: { ar: ['محتوى', 'تفاعل', 'متابعين', 'البحرين'], en: ['content', 'community', 'followers', 'bahrain'] },
+};
+
+// يبني وصف المنشور: النصّ + اسم المحل + وسوم نوعه
+function caption({ title, sub, name }, cat, lang) {
+  const tags = (TAGS[cat] || TAGS.content)[lang].map(t => '#' + t).join(' ');
+  return [title, sub, name && '— ' + name, tags].filter(x => x && x.trim()).join('\n');
+}
+
+// ثلاث درجات لحجم النصّ — بدل مزلاج حرّ يخرّب التصميم
+const TEXT_SCALES = [
+  { id: 's', v: 0.86, ar: 'صغير', en: 'Small' },
+  { id: 'm', v: 1, ar: 'متوسط', en: 'Medium' },
+  { id: 'l', v: 1.16, ar: 'كبير', en: 'Large' },
+];
+
 // مواضع الشعار الخمسة — الإزاحة نسبة من المقاس
 const LOGO_POS = [
   { id: '', ar: 'تلقائي — مع اسم المحل', en: 'Automatic — with the name' },
@@ -686,6 +724,7 @@ function drawPost(ctx, W, H, spec, f, t = null) {
     rx: (x, w) => rtl ? x : W - x - w,    // مستطيل ينعكس مع عرضه
     // تحويل الحركة للعنصر رقم i (٠ العنوان، ١ السطر الصغير، ٢ التوقيع) بالبكسل
     tf: i => A && ({ ...A.els[i], dx: A.els[i].dx * W, dy: A.els[i].dy * H }),
+    ts: f.textScale || 1,
   };
   LAYOUT_FN[spec.layout](ctx, W, H, spec, f, geo);
   ctx.restore();
@@ -871,10 +910,16 @@ function paintLayer(ctx, alpha, paint) {
 
 // يرسم كتلة نص ويرجّع ارتفاعها. لو y === null يقيس بس بلا رسم.
 function block(ctx, text, o) {
-  const { family, weight, maxSize, maxLines, maxW, color, align, x, y, stroke, tf } = o;
+  const { family, weight, maxSize, maxLines, maxW, color, align, x, y, stroke, tf, ts } = o;
   const measureAt = (w, size) => { ctx.font = `${weight} ${size}px "${family}"`; return ctx.measureText(w).width; };
-  const { size, lines } = fitLines(text, maxW, maxLines, maxSize, measureAt);
+  // ts درجة حجم النصّ. fitLines يصغّر لو ما دخل عرضاً.
+  let { size, lines } = fitLines(text, maxW, maxLines, maxSize * (ts || 1), measureAt);
   if (!lines.length) return 0;
+  // maxH سقف الارتفاع لمن يرسم داخل شريط أو صندوق — بدونه النصّ الطويل يطلع برّا
+  if (o.maxH && lines.length * size * 1.3 > o.maxH) {
+    const fit = Math.floor(o.maxH / (lines.length * 1.3));
+    ({ size, lines } = fitLines(text, maxW, maxLines, Math.max(10, fit), measureAt));
+  }
   const lh = size * 1.3;
   if (y !== null) {
     const cy = y + lines.length * lh / 2;   // التكبير حول منتصف الكتلة عشان ما تزحف لجهة
@@ -905,17 +950,17 @@ function moveTo(g, tf, cx, cy) {
 }
 
 // توقيع المحل أسفل التصميم: شعاره لو رفع واحداً، وإلا شريط باسمه
-function mark(ctx, f, W, H, { tf, color, textColor, cx, y, family }) {
+function mark(ctx, f, W, H, { tf, ts, color, textColor, cx, y, family }) {
   // نفس السبب: الشريط والاسم فوقه، لو رُسما بشفافية جزئية بان الشريط من خلف الحروف
   paintLayer(ctx, tf ? tf.a : 1, g => {
     g.save();
     if (tf) moveTo(g, tf, cx, y);
-    drawMark(g, f, W, H, { color, textColor, cx, y, family });
+    drawMark(g, f, W, H, { color, textColor, cx, y, family, ts });
     g.restore();
   });
 }
 
-function drawMark(ctx, f, W, H, { color, textColor, cx, y, family }) {
+function drawMark(ctx, f, W, H, { color, textColor, cx, y, family, ts }) {
   if (f.logo) {
     const { w, h } = logoRect(f.logo.naturalWidth || f.logo.width, f.logo.naturalHeight || f.logo.height, W);
     // موضع مختار من المستخدم يتقدّم على موضع التخطيط
@@ -924,7 +969,7 @@ function drawMark(ctx, f, W, H, { color, textColor, cx, y, family }) {
     return;
   }
   if (!f.name || !f.name.trim()) return;
-  const size = W * 0.036;
+  const size = W * 0.036 * (ts || 1);
   ctx.font = `700 ${size}px "${family}"`;
   const w = ctx.measureText(f.name).width + W * 0.09;
   const h = size * 2.1;
@@ -943,12 +988,12 @@ const LAYOUT_FN = {
     const T = { family: df, weight: dw, maxSize: W * 0.15, maxLines: 3, maxW: W * 0.82, color: fg, align: 'center', x: W / 2 };
     const B = { family: bf, weight: bw, maxSize: W * 0.055, maxLines: 4, maxW: W * 0.7, color: ac, align: 'center', x: W / 2 };
     // نقيس أولاً عشان نوسّط الكتلة كلها عمودياً
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    const h2 = block(ctx, f.sub, { tf: g.tf(1), ...B, y: null });
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    const h2 = block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, ...B, y: null });
     const top = H * 0.46 - (h1 + (h2 ? W * 0.04 + h2 : 0)) / 2;
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: top });
-    block(ctx, f.sub, { tf: g.tf(1), ...B, y: top + h1 + W * 0.04 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.84, family: bf });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: top });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, ...B, y: top + h1 + W * 0.04 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.84, family: bf });
   },
   frame(ctx, W, H, spec, f, g) {
     const M = Math.min(W, H), I = M * 0.06;
@@ -962,51 +1007,51 @@ const LAYOUT_FN = {
     ctx.fillStyle = ac;
     ctx.fillRect(0, H * 0.3, W, H * 0.34);
     const on = bestTextOn(ac);
-    const T = { family: df, weight: dw, maxSize: W * 0.12, maxLines: 2, maxW: W * 0.84, color: on, align: 'center', x: W / 2 };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.47 - h1 / 2 });
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.72, color: fg, align: 'center', x: W / 2, y: H * 0.7 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: on, cx: W / 2, y: H * 0.85, family: bf });
+    const T = { family: df, weight: dw, maxSize: W * 0.12, maxLines: 2, maxW: W * 0.84, color: on, align: 'center', x: W / 2, maxH: H * 0.3 };
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: H * 0.47 - h1 / 2 });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.72, color: fg, align: 'center', x: W / 2, y: H * 0.7 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: ac, textColor: on, cx: W / 2, y: H * 0.85, family: bf });
   },
   topSplit(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
     ctx.fillStyle = ac;
     ctx.fillRect(0, 0, W, H * 0.46);
     const on = bestTextOn(ac);
-    const T = { family: df, weight: dw, maxSize: W * 0.13, maxLines: 3, maxW: W * 0.82, color: on, align: 'center', x: W / 2 };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.23 - h1 / 2 });
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.06, maxLines: 3, maxW: W * 0.76, color: fg, align: 'center', x: W / 2, y: H * 0.58 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.85, family: bf });
+    const T = { family: df, weight: dw, maxSize: W * 0.13, maxLines: 3, maxW: W * 0.82, color: on, align: 'center', x: W / 2, maxH: H * 0.38 };
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: H * 0.23 - h1 / 2 });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.06, maxLines: 3, maxW: W * 0.76, color: fg, align: 'center', x: W / 2, y: H * 0.58 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.85, family: bf });
   },
   corner(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
     ctx.fillStyle = ac;
     ctx.fillRect(g.rx(W * 0.88, W * 0.025), H * 0.1, W * 0.025, H * 0.35);
     const x = g.px(W * 0.82), maxW = W * 0.72;
-    const h1 = block(ctx, f.title, { tf: g.tf(0), family: df, weight: dw, maxSize: W * 0.13, maxLines: 3, maxW, color: fg, align: g.align, x, y: H * 0.16 });
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 3, maxW, color: ac, align: g.align, x, y: H * 0.16 + h1 + W * 0.05 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, family: df, weight: dw, maxSize: W * 0.13, maxLines: 3, maxW, color: fg, align: g.align, x, y: H * 0.16 });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.055, maxLines: 3, maxW, color: ac, align: g.align, x, y: H * 0.16 + h1 + W * 0.05 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
   },
   stack(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
     const x = g.px(W * 0.86), maxW = W * 0.76;
-    block(ctx, f.title, { tf: g.tf(0), family: df, weight: dw, maxSize: W * 0.16, maxLines: 3, maxW, color: fg, align: g.align, x, y: H * 0.14 });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, family: df, weight: dw, maxSize: W * 0.16, maxLines: 3, maxW, color: fg, align: g.align, x, y: H * 0.14 });
     ctx.fillStyle = ac;
     ctx.fillRect(g.rx(W * 0.14, W * 0.24), H * 0.66, W * 0.24, H * 0.012);
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW, color: ac, align: g.align, x, y: H * 0.71 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.86, family: bf });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW, color: ac, align: g.align, x, y: H * 0.71 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.86, family: bf });
   },
   bottomBand(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
     ctx.fillStyle = ac;
     ctx.fillRect(0, H * 0.68, W, H * 0.32);
     const on = bestTextOn(ac);
-    const T = { family: df, weight: dw, maxSize: W * 0.14, maxLines: 3, maxW: W * 0.82, color: fg, align: 'center', x: W / 2 };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.34 - h1 / 2 });
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.78, color: on, align: 'center', x: W / 2, y: H * 0.75 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: on, textColor: ac, cx: W / 2, y: H * 0.9, family: bf });
+    const T = { family: df, weight: dw, maxSize: W * 0.14, maxLines: 3, maxW: W * 0.82, color: fg, align: 'center', x: W / 2, maxH: H * 0.5 };
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: H * 0.34 - h1 / 2 });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.78, color: on, align: 'center', x: W / 2, y: H * 0.75 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: on, textColor: ac, cx: W / 2, y: H * 0.9, family: bf });
   },
   boxed(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -1015,22 +1060,22 @@ const LAYOUT_FN = {
     ctx.beginPath();
     ctx.roundRect(W * 0.1, H * 0.22, W * 0.8, H * 0.44, Math.min(W, H) * 0.04);
     ctx.fill();
-    const T = { family: df, weight: dw, maxSize: W * 0.12, maxLines: 3, maxW: W * 0.68, color: on, align: 'center', x: W / 2 };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.44 - h1 / 2 });
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.76, color: fg, align: 'center', x: W / 2, y: H * 0.72 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.87, family: bf });
+    const T = { family: df, weight: dw, maxSize: W * 0.12, maxLines: 3, maxW: W * 0.68, color: on, align: 'center', x: W / 2, maxH: H * 0.38 };
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: H * 0.44 - h1 / 2 });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.055, maxLines: 2, maxW: W * 0.76, color: fg, align: 'center', x: W / 2, y: H * 0.72 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: fg, textColor: bestTextOn(fg), cx: W / 2, y: H * 0.87, family: bf });
   },
   duo(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
     ctx.fillStyle = ac;
     ctx.fillRect(0, H * 0.55, W, H * 0.45);
     const on = bestTextOn(ac);
-    const T = { family: df, weight: dw, maxSize: W * 0.14, maxLines: 3, maxW: W * 0.82, color: fg, align: 'center', x: W / 2 };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: H * 0.28 - h1 / 2 });
-    block(ctx, f.sub, { tf: g.tf(1), family: bf, weight: bw, maxSize: W * 0.06, maxLines: 3, maxW: W * 0.78, color: on, align: 'center', x: W / 2, y: H * 0.64 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: on, textColor: ac, cx: W / 2, y: H * 0.88, family: bf });
+    const T = { family: df, weight: dw, maxSize: W * 0.14, maxLines: 3, maxW: W * 0.82, color: fg, align: 'center', x: W / 2, maxH: H * 0.5 };
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: H * 0.28 - h1 / 2 });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, family: bf, weight: bw, maxSize: W * 0.06, maxLines: 3, maxW: W * 0.78, color: on, align: 'center', x: W / 2, y: H * 0.64 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: on, textColor: ac, cx: W / 2, y: H * 0.88, family: bf });
   },
   sideBar(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
@@ -1039,23 +1084,23 @@ const LAYOUT_FN = {
     const cx = g.px(W * 0.41);
     const T = { family: df, weight: dw, maxSize: W * 0.13, maxLines: 3, maxW: W * 0.66, color: fg, align: 'center', x: cx };
     const B = { family: bf, weight: bw, maxSize: W * 0.05, maxLines: 3, maxW: W * 0.62, color: ac, align: 'center', x: cx };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    const h2 = block(ctx, f.sub, { tf: g.tf(1), ...B, y: null });
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    const h2 = block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, ...B, y: null });
     const top = H * 0.44 - (h1 + (h2 ? W * 0.04 + h2 : 0)) / 2;
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: top });
-    block(ctx, f.sub, { tf: g.tf(1), ...B, y: top + h1 + W * 0.04 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: fg, textColor: bestTextOn(fg), cx, y: H * 0.85, family: bf });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: top });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, ...B, y: top + h1 + W * 0.04 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: fg, textColor: bestTextOn(fg), cx, y: H * 0.85, family: bf });
   },
   outline(ctx, W, H, spec, f, g) {
     const { fg, ac } = spec.palette, [df, dw, bf, bw] = g.font;
     const T = { family: df, weight: dw, maxSize: W * 0.16, maxLines: 3, maxW: W * 0.84, color: ac, align: 'center', x: W / 2, stroke: true };
     const B = { family: bf, weight: bw, maxSize: W * 0.055, maxLines: 3, maxW: W * 0.7, color: fg, align: 'center', x: W / 2 };
-    const h1 = block(ctx, f.title, { tf: g.tf(0), ...T, y: null });
-    const h2 = block(ctx, f.sub, { tf: g.tf(1), ...B, y: null });
+    const h1 = block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: null });
+    const h2 = block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, ...B, y: null });
     const top = H * 0.45 - (h1 + (h2 ? W * 0.05 + h2 : 0)) / 2;
-    block(ctx, f.title, { tf: g.tf(0), ...T, y: top });
-    block(ctx, f.sub, { tf: g.tf(1), ...B, y: top + h1 + W * 0.05 });
-    mark(ctx, f, W, H, { tf: g.tf(2), color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
+    block(ctx, f.title, { tf: g.tf(0), ts: g.ts, ...T, y: top });
+    block(ctx, f.sub, { tf: g.tf(1), ts: g.ts, ...B, y: top + h1 + W * 0.05 });
+    mark(ctx, f, W, H, { tf: g.tf(2), ts: g.ts, color: ac, textColor: bestTextOn(ac), cx: W / 2, y: H * 0.85, family: bf });
   },
 };
 
@@ -1063,5 +1108,6 @@ if (typeof module !== 'undefined') module.exports = {
   rng, makeSpecs, luminance, bestTextOn, contrastRatio, ensureContrast, brandPalettes,
   logoRect, shade, wrapText, fitLines, coverRect, textLang, pickFont, SCRIM,
   PALETTES, LAYOUTS, ORNAMENTS, FONTS, SIZES, TYPES, CATS, UI, GRADIENTS, LOGO_POS, logoAt,
+  postFileName, caption, TAGS, TEXT_SCALES,
   ANIMS, ANIM_FAMS, BG_MOTIONS, EASE, DURATIONS, animState, pickAnim, pickBg, ornMotion,
 };

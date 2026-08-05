@@ -11,6 +11,31 @@
 <link rel="alternate" hreflang="en" href="./">
 <link rel="alternate" hreflang="ar" href="../">
 <link rel="alternate" hreflang="x-default" href="../">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Post Maker">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ar_BH">
+<meta property="og:url" content="https://mohframevision.github.io/post-generator/en/">
+<meta property="og:title" content="Free Instagram Post Maker — no design skills needed">
+<meta property="og:description" content="Type your text and get eight finished designs — image or video. Free, no sign-up, and everything runs inside your browser.">
+<meta property="og:image" content="https://mohframevision.github.io/post-generator/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="An example post made with this tool">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Free Instagram Post Maker — no design skills needed">
+<meta name="twitter:description" content="Type your text, get eight finished designs. Free, no sign-up.">
+<meta name="twitter:image" content="https://mohframevision.github.io/post-generator/og.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication",
+"name":"Arabic & English Instagram Post Maker","applicationCategory":"DesignApplication",
+"operatingSystem":"Any (web browser)","inLanguage":["ar","en"],
+"url":"https://mohframevision.github.io/post-generator/en/",
+"description":"A free tool: type your text and get eight finished Instagram post designs in Arabic or English, as an image or an MP4 video. Runs entirely in your browser.",
+"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+"isAccessibleForFree":true,
+"featureList":["37 post types","Arabic and English","Square, portrait and story","PNG or MP4 export","Brand colours and logo"]}
+</script>
 <!-- Put the Google Search Console verification tag here after publishing -->
 <script>
   // Set the theme before the page paints, otherwise it flashes white then goes dark
@@ -48,6 +73,7 @@
             <div id="chips" class="chips"></div></div>
           <div><label for="sub" id="subLabel"></label>
             <textarea id="sub" rows="2" maxlength="140"></textarea></div>
+          <div><label data-i18n="lTextSize"></label><div id="textSize" class="segs"></div></div>
           <div><label for="name" data-i18n="lName"></label>
             <input id="name" maxlength="40" autocomplete="off"></div>
           <div><label for="photo" data-i18n="lPhoto"></label>
@@ -99,6 +125,11 @@
     </section>
   </div>
 
+  <section class="showcase-wrap">
+    <h2 data-i18n="showcase"></h2>
+    <div id="showcase" class="showcase"></div>
+  </section>
+
   <section class="explain">
     <h2>Why this tool?</h2>
     <p>Most small business owners need one simple Instagram post: a sale, an opening,
@@ -130,6 +161,8 @@
       third party learns about your visit.</p>
   </section>
 </main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <dialog id="zoom">
   <canvas id="zoomCanvas"></canvas>

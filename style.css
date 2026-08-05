@@ -82,6 +82,32 @@ button:disabled { opacity:.32; cursor:default; }
          padding:9px 15px; font-size:13px; font-weight:600; }
 .ghost:hover { background:var(--hover); opacity:1; }
 .hint { color:var(--dim); font-size:13px; }
+.segs { display:flex; gap:0; }
+.seg { flex:1; background:var(--bg); color:var(--dim); border:1px solid var(--line);
+       border-radius:0; padding:0 8px; min-height:40px; font-size:13px; font-weight:600; }
+.seg:first-child { border-start-start-radius:var(--rs); border-end-start-radius:var(--rs); }
+.seg:last-child { border-start-end-radius:var(--rs); border-end-end-radius:var(--rs); }
+.seg + .seg { border-inline-start:0; }
+.seg.on { background:var(--btn-bg); color:var(--btn-fg); border-color:var(--btn-bg); }
+.seg:hover:not(.on) { background:var(--hover); opacity:1; }
+
+/* إشعار قصير */
+.toast { position:fixed; inset-inline:0; bottom:24px; margin:0 auto; width:max-content;
+         max-width:88vw; background:var(--btn-bg); color:var(--btn-fg);
+         padding:13px 22px; border-radius:999px; font-weight:700; font-size:14px;
+         box-shadow:var(--lift); z-index:99; opacity:0; transform:translateY(14px);
+         pointer-events:none; transition:opacity .2s, transform .2s; }
+.toast.show { opacity:1; transform:none; }
+
+/* معرض أمثلة — مرسوم بنفس المحرّك لا صور جاهزة */
+.showcase-wrap { margin-top:60px; padding-top:26px; border-top:1px solid var(--line); }
+.showcase-wrap h2 { font-family:"Cairo"; font-size:19px; margin:0 0 16px; letter-spacing:-.01em; }
+html[lang="en"] .showcase-wrap h2 { font-family:"Outfit","Inter",sans-serif; }
+.showcase { display:grid; gap:clamp(10px,1.2vw,18px);
+            grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
+.showcase canvas { width:100%; height:auto; display:block; border-radius:var(--r);
+                   box-shadow:var(--shadow); }
+
 .chips { display:flex; gap:7px; flex-wrap:wrap; align-items:center; margin-top:8px; }
 .chip { background:var(--bg); color:var(--fg); border:1px solid var(--line);
         padding:0 13px; min-height:34px; font-size:12.5px; font-weight:600; }

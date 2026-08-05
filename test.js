@@ -3,6 +3,7 @@ const assert = require('assert');
 const { rng, makeSpecs, bestTextOn, luminance, contrastRatio, ensureContrast, brandPalettes,
         logoRect, shade, wrapText, fitLines, coverRect, textLang, pickFont, SCRIM,
         LAYOUTS, ORNAMENTS, PALETTES, SIZES, TYPES, CATS, FONTS, UI, GRADIENTS, LOGO_POS, logoAt,
+        postFileName, caption, TAGS, TEXT_SCALES,
         ANIMS, ANIM_FAMS, BG_MOTIONS, EASE, DURATIONS, animState, pickAnim, pickBg } = require('./design.js');
 
 // نفس البذرة تعطي نفس النتيجة دائماً
@@ -198,6 +199,45 @@ const at = s => JSON.stringify(makeSpecs((1000 + s * 7919) >>> 0));
 assert.strictEqual(at(3), at(3));
 assert.notStrictEqual(at(3), at(4));
 assert.strictEqual(at(2), at(3 - 1), 'الرجوع خطوة ما رجّع نفس المجموعة');
+
+// ===== اسم الملف: فريد وآمن =====
+const d1 = new Date(2026, 7, 6, 14, 30, 5);
+assert.strictEqual(postFileName('Offer / Sale', 'story', 'mp4', d1), 'story-offer-sale-20260806_143005.mp4');
+assert.strictEqual(postFileName("We're hiring", 'square', 'png', d1), 'square-we-re-hiring-20260806_143005.png');
+// أسماء عربية أو فارغة ما تكسر الاسم
+for (const bad of ['', null, 'خصم ٢٠٪', '///', '   '])
+  assert.ok(/^[a-z0-9_.-]+$/.test(postFileName(bad, 'square', 'png', d1)),
+    `اسم ملف غير آمن من: ${JSON.stringify(bad)}`);
+// ثانيتان مختلفتان = اسمان مختلفان (تنزيل متتابع ما يتعارض)
+assert.notStrictEqual(postFileName('x', 's', 'png', new Date(2026, 0, 1, 0, 0, 0)),
+                      postFileName('x', 's', 'png', new Date(2026, 0, 1, 0, 0, 1)));
+// وكل مقاس ونوع يعطي اسماً مميّزاً
+const names = new Set();
+for (const s of SIZES) for (const t of TYPES) names.add(postFileName(t.en.name, s.id, 'png', d1));
+assert.strictEqual(names.size, SIZES.length * TYPES.length, 'اسمان متطابقان لنوعين مختلفين');
+
+// ===== الوصف والوسوم =====
+for (const c of CATS)
+  for (const L of ['ar', 'en']) {
+    assert.ok(TAGS[c.id] && TAGS[c.id][L] && TAGS[c.id][L].length >= 3,
+      `وسوم ناقصة للمجموعة ${c.id} (${L})`);
+    TAGS[c.id][L].forEach(t => assert.ok(!/\s|#/.test(t), `وسم فيه فراغ أو #: ${t}`));
+  }
+const cap = caption({ title: 'خصم ٢٠٪', sub: 'اليوم فقط', name: 'مطعم الديوان' }, 'offers', 'ar');
+assert.ok(cap.includes('خصم ٢٠٪') && cap.includes('اليوم فقط') && cap.includes('مطعم الديوان'));
+assert.ok(cap.includes('#عروض'), 'الوسوم ما انضافت');
+// خانات فاضية ما تخلّي أسطراً فارغة
+assert.ok(!/\n\n/.test(caption({ title: 'وحده', sub: '', name: '' }, 'offers', 'ar')));
+
+// ===== درجات حجم النصّ =====
+assert.strictEqual(TEXT_SCALES.length, 3, 'المفروض ثلاث درجات لا أكثر');
+assert.deepStrictEqual(TEXT_SCALES.map(s => s.v), [...TEXT_SCALES.map(s => s.v)].sort((a, b) => a - b),
+  'الدرجات مو مرتّبة تصاعدياً');
+assert.strictEqual(TEXT_SCALES[1].v, 1, 'الدرجة الوسطى لازم تكون الأصل');
+for (const s of TEXT_SCALES) {
+  assert.ok(s.v > 0.5 && s.v < 1.6, `درجة غير معقولة: ${s.v}`);
+  for (const L of ['ar', 'en']) assert.ok(s[L], `اسم درجة ناقص (${L})`);
+}
 
 // ===== التدرّجات ومواضع الشعار =====
 // كل تدرّج يحمل ألوان نصّه، فلازم تنجح بنفس شروط اللوحات
@@ -431,8 +471,25 @@ for (const p of pages) {
                     'brandBox', 'titleLabel', 'subLabel', 'animate',
                     'speed', 'power', 'speedVal', 'powerVal', 'motionCtl',
                     'typeSearch', 'typeNote', 'animPick', 'bgPick',
-                    'chips', 'logoPos', 'scrim', 'scrimVal', 'grad'])
+                    'chips', 'logoPos', 'scrim', 'scrimVal', 'grad',
+                    'textSize', 'toast', 'showcase'])
     assert.ok(html.includes(`id="${id}"`), `${p.file}: ناقص العنصر ${id}`);
+
+  // وسوم المشاركة والبيانات المنظّمة
+  for (const tag of ['og:title', 'og:description', 'og:image', 'og:url', 'og:type',
+                     'twitter:card', 'twitter:image'])
+    assert.ok(html.includes(`"${tag}"`), `${p.file}: ناقص ${tag}`);
+  const ld = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(ld, `${p.file}: ناقص JSON-LD`);
+  const schema = JSON.parse(ld[1]);
+  assert.strictEqual(schema['@type'], 'SoftwareApplication', `${p.file}: نوع Schema غلط`);
+  assert.strictEqual(schema.offers.price, '0', `${p.file}: المفروض مجاني بالبيانات المنظّمة`);
+  assert.ok(schema.isAccessibleForFree && schema.url && schema.description,
+    `${p.file}: بيانات منظّمة ناقصة`);
+  // صورة المشاركة لازم تكون موجودة فعلاً
+  const og = /property="og:image" content="[^"]*\/([^/"]+)"/.exec(html);
+  assert.ok(og && fs.existsSync(path.join(__dirname, og[1])),
+    `${p.file}: og:image يشير لملف مفقود (${og && og[1]})`);
 
   // كل مفتاح نص بالصفحة موجود بجدول النصوص
   for (const m of html.matchAll(/data-i18n(?:-ph)?="([^"]+)"/g))

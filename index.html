@@ -11,6 +11,31 @@
 <link rel="alternate" hreflang="ar" href="./">
 <link rel="alternate" hreflang="en" href="./en/">
 <link rel="alternate" hreflang="x-default" href="./">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="مولّد المنشورات">
+<meta property="og:locale" content="ar_BH">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:url" content="https://mohframevision.github.io/post-generator/">
+<meta property="og:title" content="تصميم منشور إنستقرام بالعربي — بلا خبرة تصميم">
+<meta property="og:description" content="اكتب نص عرضك وخذ ثمانية تصاميم جاهزة بالعربي: صورة أو فيديو. مجاني، بلا تسجيل، وكل شي داخل متصفحك.">
+<meta property="og:image" content="https://mohframevision.github.io/post-generator/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="مثال على منشور صُنع بالأداة">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="تصميم منشور إنستقرام بالعربي — بلا خبرة تصميم">
+<meta name="twitter:description" content="اكتب نصك وخذ ثمانية تصاميم جاهزة. مجاني وبلا تسجيل.">
+<meta name="twitter:image" content="https://mohframevision.github.io/post-generator/og.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication",
+"name":"مولّد منشورات إنستقرام بالعربي","applicationCategory":"DesignApplication",
+"operatingSystem":"Any (web browser)","inLanguage":["ar","en"],
+"url":"https://mohframevision.github.io/post-generator/",
+"description":"أداة مجانية تكتب فيها نصك فتخرج لك ثمانية تصاميم منشورات جاهزة بالعربي أو الإنجليزي، صورة أو فيديو. تعمل كلياً داخل المتصفح.",
+"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+"isAccessibleForFree":true,
+"featureList":["٣٧ نوع منشور","عربي وإنجليزي","مربّع وعمودي وستوري","تصدير صورة أو فيديو MP4","ألوان وشعار العلامة التجارية"]}
+</script>
 <!-- ضع هنا وسم التحقق من Google Search Console بعد النشر -->
 <script>
   // نحطّ الثيم قبل ما ترسم الصفحة، وإلا يومض أبيض ثم يصير غامقاً
@@ -48,6 +73,7 @@
             <div id="chips" class="chips"></div></div>
           <div><label for="sub" id="subLabel"></label>
             <textarea id="sub" rows="2" maxlength="140"></textarea></div>
+          <div><label data-i18n="lTextSize"></label><div id="textSize" class="segs"></div></div>
           <div><label for="name" data-i18n="lName"></label>
             <input id="name" maxlength="40" autocomplete="off"></div>
           <div><label for="photo" data-i18n="lPhoto"></label>
@@ -99,6 +125,11 @@
     </section>
   </div>
 
+  <section class="showcase-wrap">
+    <h2 data-i18n="showcase"></h2>
+    <div id="showcase" class="showcase"></div>
+  </section>
+
   <section class="explain">
     <h2>ليش هذي الأداة؟</h2>
     <p>أغلب أصحاب المحلات الصغيرة يحتاجون منشوراً بسيطاً لإنستقرام: عرض، افتتاح، مواعيد،
@@ -128,6 +159,8 @@
       وحتى الخطوط محمّلة من نفس الموقع فما يعرف عن زيارتك أي طرف ثالث.</p>
   </section>
 </main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <dialog id="zoom">
   <canvas id="zoomCanvas"></canvas>

@@ -29,6 +29,7 @@ const fields = () => ({
   bgId: bgPick.value || null,
   logoPos: logoPosEl.value || null,
   scrim: +scrimEl.value / 100,
+  textScale: (TEXT_SCALES.find(s => s.id === textSize) || TEXT_SCALES[1]).v,
 });
 
 // تدرّج اختاره المستخدم يستبدل لوحة ألوان التصميم كاملةً — الألوان تجي معه
@@ -57,6 +58,7 @@ function paintUI() {
   fillTypes();
   fillExtras();
   fillChips();
+  fillTextSize();
   SIZES.forEach((x, i) => sizeEl.add(new Option(x[ui], i)));
   brandFont.add(new Option(t.autoFont, ''));
   for (const key of ['ar', 'en']) {
@@ -66,6 +68,41 @@ function paintUI() {
     brandFont.appendChild(grp);
   }
   paintTheme();
+}
+
+// ===== حجم النصّ: ثلاث درجات =====
+let textSize = localStorage.getItem('textSize') || 'm';
+
+function fillTextSize() {
+  const box = document.getElementById('textSize');
+  box.innerHTML = '';
+  for (const s of TEXT_SCALES) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'seg' + (s.id === textSize ? ' on' : '');
+    b.textContent = s[ui];
+    b.onclick = () => {
+      textSize = s.id; localStorage.setItem('textSize', s.id);
+      [...box.children].forEach(c => c.classList.toggle('on', c === b));
+      render();
+    };
+    box.appendChild(b);
+  }
+}
+
+// ===== إشعار قصير =====
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ===== نسخ الوصف مع وسوم نوع المنشور =====
+async function copyCaption() {
+  const txt = caption(fields(), TYPES[typeEl.value || 0].cat, ui);
+  try { await navigator.clipboard.writeText(txt); toast(T().copied); }
+  catch { toast(T().copyFailed); }
 }
 
 // ===== ضوابط الصورة والشعار والتدرّج =====
@@ -200,6 +237,7 @@ function render() {
     actions.className = 'actions';
     actions.appendChild(makeBtn(T().download, () => save(spec)));
     if (canRecord) actions.appendChild(makeBtn(T().video, b => saveVideo(spec, b)));
+    actions.appendChild(makeBtn(T().copy, copyCaption));
     if (canShareFiles) actions.appendChild(makeBtn(T().share, () => share(spec)));
     card.appendChild(actions);
     grid.appendChild(card);
@@ -353,13 +391,18 @@ function toBlob(spec) {
   return new Promise(res => c.toBlob(res, 'image/png'));
 }
 
-async function save(spec) {
+// اسم كل ملف فريد — تنزيل عدة تصاميم ما يتعارض ولا يستبدل بعضه
+const outName = ext => postFileName(TYPES[typeEl.value || 0].en.name, size().id, ext);
+
+function download(blob, ext) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(await toBlob(spec));
-  a.download = 'post.png';
+  a.href = URL.createObjectURL(blob);
+  a.download = outName(ext);
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+
+async function save(spec) { download(await toBlob(spec), 'png'); }
 
 // ===== تصدير الفيديو =====
 // نفضّل MP4 لأن إنستقرام يقبله مباشرة. WebM بديل لو المتصفح ما يعرف MP4.
@@ -402,11 +445,8 @@ async function saveVideo(spec, btn) {
     rec.stop();
     await stopped;
 
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(chunks, { type: videoType }));
-    a.download = videoType.startsWith('video/mp4') ? 'post.mp4' : 'post.webm';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    download(new Blob(chunks, { type: videoType }),
+      videoType.startsWith('video/mp4') ? 'mp4' : 'webm');
   } finally {
     btn.textContent = label;
     btn.disabled = false;
@@ -523,8 +563,40 @@ nameEl.value = localStorage.getItem('shopName') ||
   (ui === 'ar' ? 'مطعم الديوان' : 'Diwan Café');
 nameEl.addEventListener('input', () => localStorage.setItem('shopName', nameEl.value));
 
+// ===== معرض أمثلة — يُرسم بنفس المحرّك، لا صور جاهزة =====
+// ponytail: بذور ثابتة عشان الأمثلة ما تتغيّر كل زيارة. لو بغيت تنويعاً، بدّل الأرقام.
+const SHOWCASE = [
+  { seed: 4111, type: 'افتتاح', name: 'مقهى الرواق' },
+  { seed: 917, type: 'خصم', name: 'متجر ليان' },
+  { seed: 2604, type: 'وجبة اليوم', name: 'مطعم الديوان' },
+  { seed: 7788, type: 'وظيفة شاغرة', name: 'صالون نور' },
+  { seed: 5150, type: 'مسابقة', name: 'حلويات بسمة' },
+  { seed: 3322, type: 'مواعيد الدوام', name: 'عيادة الشفاء' },
+];
+
+function drawShowcase() {
+  const box = document.getElementById('showcase');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const s of SHOWCASE) {
+    const i = TYPES.findIndex(x => x.ar.name === s.type);
+    if (i < 0) continue;
+    const t = TYPES[i][ui];
+    const spec = makeSpecs(s.seed, 1)[0];
+    const c = document.createElement('canvas');
+    c.width = 420; c.height = 420;
+    drawPost(c.getContext('2d'), 420, 420, spec, {
+      title: t.t[1], sub: t.s[1], name: ui === 'ar' ? s.name : t.name,
+      lang: ui, mood: TYPES[i].mood, textScale: 1, scrim: 0.7,
+    }, null);
+    box.appendChild(c);
+  }
+}
+
 paintUI();
 loadBrand();
 loadExtras();
 applyType();
 build();
+drawShowcase();
+loadFonts().then(drawShowcase);   // نعيد رسمه لمّا توصل الخطوط الحقيقية
