@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Free Instagram Post Maker — no design skills needed</title>
+<meta name="description" content="Type your text and get a finished Instagram post: sales, openings, opening hours, hiring. Square and story sizes. Free, no sign-up, no design app. Works in English and Arabic.">
+<link rel="canonical" href="./">
+<link rel="alternate" hreflang="en" href="./">
+<link rel="alternate" hreflang="ar" href="../">
+<link rel="alternate" hreflang="x-default" href="../">
+<!-- Put the Google Search Console verification tag here after publishing -->
+<script>
+  // Set the theme before the page paints, otherwise it flashes white then goes dark
+  document.documentElement.dataset.theme = localStorage.getItem('theme') ||
+    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+</script>
+<link href="../fonts.css" rel="stylesheet">
+<link href="../style.css" rel="stylesheet">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a href="../index.html" hreflang="ar">العربية</a>
+    <button id="theme"></button>
+  </div>
+  <h1 data-i18n="h1"></h1>
+  <p class="lede" data-i18n="lede"></p>
+
+  <div class="fields">
+    <div class="two">
+      <div><label for="type" data-i18n="lType"></label><select id="type"></select></div>
+      <div><label for="size" data-i18n="lSize"></label><select id="size"></select></div>
+    </div>
+    <div><label for="title" id="titleLabel"></label>
+      <input id="title" maxlength="70" autocomplete="off"></div>
+    <div><label for="sub" id="subLabel"></label>
+      <textarea id="sub" rows="2" maxlength="140"></textarea></div>
+    <div><label for="name" data-i18n="lName"></label>
+      <input id="name" maxlength="40" autocomplete="off"></div>
+    <div><label for="photo" data-i18n="lPhoto"></label>
+      <div class="photo-row">
+        <input id="photo" type="file" accept="image/*">
+        <button id="clearPhoto" class="ghost" data-i18n="clearPhoto" hidden></button>
+      </div></div>
+  </div>
+
+  <details id="brandBox">
+    <summary data-i18n="brand"></summary>
+    <div class="brand">
+      <label class="check"><input type="checkbox" id="useBrand"> <span data-i18n="useBrand"></span></label>
+      <div class="colors">
+        <label><span data-i18n="primary"></span> <input type="color" id="brandColor" value="#0B3D2E"></label>
+        <label><span data-i18n="accent"></span> <input type="color" id="brandAccent" value="#D4AF37"></label>
+      </div>
+      <div><label for="brandFont" data-i18n="bFont"></label><select id="brandFont"></select></div>
+      <div><label for="logo" data-i18n="lLogo"></label>
+        <div class="photo-row">
+          <input id="logo" type="file" accept="image/*">
+          <button id="clearLogo" class="ghost" data-i18n="clearLogo" hidden></button>
+        </div></div>
+    </div>
+  </details>
+
+  <div class="bar">
+    <button id="back" data-i18n="back" disabled></button>
+    <button id="more" data-i18n="more"></button>
+    <label class="check"><input type="checkbox" id="animate"> <span data-i18n="animate"></span></label>
+    <span id="motionCtl" class="sliders">
+      <label><span data-i18n="speed"></span>
+        <input type="range" id="speed" min="0.4" max="2.2" step="0.1" value="0.8"><b id="speedVal"></b></label>
+      <label><span data-i18n="power"></span>
+        <input type="range" id="power" min="0" max="1.8" step="0.1" value="0.3"><b id="powerVal"></b></label>
+    </span>
+    <span class="hint" data-i18n="hint"></span>
+  </div>
+
+  <div id="grid"></div>
+
+  <dialog id="zoom">
+    <canvas id="zoomCanvas"></canvas>
+    <div class="actions" id="zoomActions"></div>
+  </dialog>
+
+  <section class="explain">
+    <h2>Why this tool?</h2>
+    <p>Most small business owners need one simple Instagram post: a sale, an opening,
+      the hours, an announcement. Design apps hand you thousands of templates and
+      drag-and-drop tools, and you end up spending your time choosing instead of posting.
+      Here there is not a single design decision to make: you type, and you pick.</p>
+    <h2>How do I use it?</h2>
+    <p>Choose a post type and a size (square for a normal post, or story), then type your
+      text and your business name. Eight different designs appear. If you don't like them,
+      hit "More designs" — and if you clicked too fast, "Back" returns the exact same set.
+      When one works for you, hit Download or Share.</p>
+    <h2>Does it work in Arabic?</h2>
+    <p>Yes, and that is what it was built for first. Type in Arabic and the tool detects it
+      automatically: it switches to real Arabic typefaces and flips the layout right-to-left.
+      Arabic letters join correctly, which most design tools and every AI image generator
+      still get wrong. There is a
+      <a href="../index.html" hreflang="ar">full Arabic version of this page</a> too.</p>
+    <h2>Can I use my own photo?</h2>
+    <p>Yes. Pick an image from your device and it becomes the background of every design,
+      with a light wash over it so your text stays readable whether the photo is bright or
+      dark. It is cropped to fit automatically — no editing needed.</p>
+    <h2>Can I lock in my brand colours?</h2>
+    <p>Yes, under "Your brand". Choose two colours and a font, upload your logo, and every
+      design follows your identity. Your settings are saved in your browser, so you only
+      set them once.</p>
+    <h2>Is it really free?</h2>
+    <p>Yes. Everything runs inside your browser — your text and photos are never uploaded
+      anywhere, no account is needed, and even the fonts are served from this site, so no
+      third party learns about your visit.</p>
+  </section>
+</main>
+
+<script src="../design.js"></script>
+<script src="../app.js"></script>
+</body>
+</html>

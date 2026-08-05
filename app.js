@@ -1,0 +1,377 @@
+// منطق الواجهة — مشترك بين الصفحة العربية والإنجليزية.
+// اللغة تُؤخذ من الصفحة نفسها (<html lang>)، وكل صفحة رابط مستقل بعنوانها الخاص.
+
+const grid = document.getElementById('grid');
+const titleEl = document.getElementById('title');
+const subEl = document.getElementById('sub');
+const nameEl = document.getElementById('name');
+const typeEl = document.getElementById('type');
+const sizeEl = document.getElementById('size');
+const brandFont = document.getElementById('brandFont');
+const COUNT = 8;
+
+const ui = document.documentElement.lang === 'ar' ? 'ar' : 'en';
+const T = () => UI[ui];
+
+const base = Math.floor(Math.random() * 1e9);
+let step = 0;      // كل ضغطة «غيرها» تزيد خطوة، و«السابق» ينقصها — والنتيجة ثابتة لكل خطوة
+let specs = [];
+let image = null, logo = null;
+
+// لغة النص المكتوب هي اللي تحدّد الخط والاتجاه — لا لغة الصفحة
+const postLang = () => textLang(titleEl.value + ' ' + subEl.value + ' ' + nameEl.value, ui);
+const fields = () => ({
+  title: titleEl.value, sub: subEl.value, name: nameEl.value,
+  image, logo, lang: postLang(),
+  mood: TYPES[typeEl.value || 0].mood,   // الحركة تتبع مزاج نوع المنشور
+  power: +powerEl.value,                  // وشدّتها يضبطها المستخدم
+});
+const size = () => SIZES[sizeEl.value];
+
+// ===== الثيم =====
+const themeBtn = document.getElementById('theme');
+const paintTheme = () => themeBtn.textContent =
+  document.documentElement.dataset.theme === 'dark' ? T().light : T().dark;
+themeBtn.onclick = () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('theme', next);
+  paintTheme();
+};
+
+// ===== نصوص الواجهة والقوائم =====
+function paintUI() {
+  const t = T();
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t[el.dataset.i18n]);
+  TYPES.forEach((x, i) => typeEl.add(new Option(x[ui].name, i)));
+  SIZES.forEach((x, i) => sizeEl.add(new Option(x[ui], i)));
+  brandFont.add(new Option(t.autoFont, ''));
+  for (const key of ['ar', 'en']) {
+    const grp = document.createElement('optgroup');
+    grp.label = key === 'ar' ? 'عربي' : 'English';
+    FONTS[key].forEach((fp, i) => grp.appendChild(new Option(fp[0], key + ':' + i)));
+    brandFont.appendChild(grp);
+  }
+  paintTheme();
+}
+
+// ===== نوع المنشور =====
+function applyType() {
+  const t = TYPES[typeEl.value][ui];
+  document.getElementById('titleLabel').textContent = t.t[0];
+  document.getElementById('subLabel').textContent = t.s[0];
+  // نحطّ المثال بس لو الخانة فاضية أو فيها مثال جاهز — ما نمسح كتابة المستخدم
+  if (isExample(titleEl.value, 't')) titleEl.value = t.t[1];
+  if (isExample(subEl.value, 's')) subEl.value = t.s[1];
+  render();
+}
+const isExample = (v, k) => !v.trim() ||
+  TYPES.some(x => x.ar[k][1] === v || x.en[k][1] === v);
+
+typeEl.addEventListener('change', applyType);
+sizeEl.addEventListener('change', render);
+
+// ===== الرسم =====
+const canShareFiles = !!(navigator.canShare &&
+  navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] }));
+
+// خط العلامة المثبّت (لو اختاره) يتجاوز الاختيار التلقائي
+function applyFont(spec) {
+  if (!brandFont.value) return spec;
+  const [k, i] = brandFont.value.split(':');
+  return { ...spec, font: FONTS[k][+i] };
+}
+
+let live = [];   // اللوحات المعروضة الحين، عشان حلقة الحركة تعيد رسمها
+
+function render() {
+  const f = fields(), sz = size();
+  const pw = 440, ph = Math.round(pw * sz.h / sz.w);
+  grid.innerHTML = '';
+  live = [];
+  specs.map(applyFont).forEach(spec => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const c = document.createElement('canvas');
+    c.width = pw; c.height = ph;
+    const ctx = c.getContext('2d');
+    drawPost(ctx, pw, ph, spec, f, animOn() ? 0 : null);
+    live.push({ ctx, pw, ph, spec });
+    c.title = T().zoomTip;
+    c.onclick = () => openZoom(spec, c);
+    card.appendChild(c);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.appendChild(makeBtn(T().download, () => save(spec)));
+    if (canRecord) actions.appendChild(makeBtn(T().video, b => saveVideo(spec, b)));
+    if (canShareFiles) actions.appendChild(makeBtn(T().share, () => share(spec)));
+    card.appendChild(actions);
+    grid.appendChild(card);
+  });
+}
+
+function makeBtn(label, fn) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.onclick = () => fn(b);
+  return b;
+}
+
+// ===== الحركة =====
+const animBox = document.getElementById('animate');
+const speedEl = document.getElementById('speed');
+const powerEl = document.getElementById('power');
+const motionCtl = document.getElementById('motionCtl');
+const stillMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const animOn = () => animBox.checked;
+// المدة الفعلية بعد مزلاج السرعة — أعلى سرعة = دورة أقصر
+const cycleMs = spec => spec.durationMs / +speedEl.value;
+let t0 = performance.now();
+
+// حلقة واحدة ترسم كل اللوحات — أرخص من حلقة لكل تصميم
+function tick(now) {
+  requestAnimationFrame(tick);
+  if (!animOn() || document.hidden || !live.length) return;
+  const f = fields();
+  for (const L of live) {
+    const d = cycleMs(L.spec);
+    drawPost(L.ctx, L.pw, L.ph, L.spec, f, ((now - t0) % d) / d);
+  }
+}
+requestAnimationFrame(tick);
+
+function paintMotion() {
+  motionCtl.hidden = !animBox.checked;
+  document.getElementById('speedVal').textContent = (+speedEl.value).toFixed(1) + '×';
+  document.getElementById('powerVal').textContent = (+powerEl.value).toFixed(1) + '×';
+}
+animBox.addEventListener('change', () => {
+  localStorage.setItem('anim', animBox.checked ? '1' : '0');
+  t0 = performance.now();
+  paintMotion();
+  render();
+});
+// المزالج تشتغل فوراً وأنت تسحب — الحلقة تلتقط القيمة الجديدة بالإطار الجاي
+[speedEl, powerEl].forEach(el => el.addEventListener('input', () => {
+  localStorage.setItem(el.id === 'speed' ? 'motionSpeed' : 'motionPower', el.value);
+  paintMotion();
+  if (!animOn()) render();
+}));
+
+// من يكره الحركة ما نفرضها عليه، ومن حفظ اختياره نحترمه
+animBox.checked = (localStorage.getItem('anim') ?? (stillMotion ? '0' : '1')) === '1';
+// الافتراضي مضبوط بالعين لا بالتخمين: حركة هادئة وخفيفة تناسب أغلب المنشورات
+const MOTION_DEFAULTS = { speed: '0.8', power: '0.3' };
+speedEl.value = localStorage.getItem('motionSpeed') ?? MOTION_DEFAULTS.speed;
+powerEl.value = localStorage.getItem('motionPower') ?? MOTION_DEFAULTS.power;
+paintMotion();
+
+// ننزّل خطوط هذي المجموعة فقط — عندنا ٣٢ عائلة، تحميلها كلها يقتل جوال بشريحة
+function loadFonts() {
+  const f = fields();
+  const text = (f.title + f.sub + f.name) || 'Aa';
+  const jobs = specs.map(applyFont).flatMap(s => {
+    const [df, dw, bf, bw] = pickFont(s, f.lang);
+    return [`${dw} 100px "${df}"`, `${bw} 100px "${bf}"`];
+  });
+  return Promise.all([...new Set(jobs)].map(j =>
+    document.fonts.load(j, text).catch(() => {})));
+}
+
+// ===== التكبير =====
+const zoomDlg = document.getElementById('zoom');
+const zoomCanvas = document.getElementById('zoomCanvas');
+const zoomActions = document.getElementById('zoomActions');
+
+function openZoom(spec, fromEl) {
+  const sz = size();
+  zoomCanvas.width = sz.w; zoomCanvas.height = sz.h;
+  const ctx = zoomCanvas.getContext('2d');
+  drawPost(ctx, sz.w, sz.h, spec, fields(), animOn() ? 0 : null);
+  // النافذة تدخل حلقة الحركة نفسها، وتخرج منها لما تنسكّر
+  live.push({ ctx, pw: sz.w, ph: sz.h, spec, zoom: true });
+  zoomActions.innerHTML = '';
+  zoomActions.appendChild(makeBtn(T().download, () => save(spec)));
+  if (canRecord) zoomActions.appendChild(makeBtn(T().video, b => saveVideo(spec, b)));
+  if (canShareFiles) zoomActions.appendChild(makeBtn(T().share, () => share(spec)));
+  zoomActions.appendChild(makeBtn(T().close, () => zoomDlg.close()));
+  zoomDlg.showModal();
+
+  if (stillMotion) return;
+  // نكبّر من مكان الصورة اللي ضغطها بالضبط إلى مكانها النهائي
+  const from = fromEl.getBoundingClientRect(), to = zoomDlg.getBoundingClientRect();
+  const scale = from.width / to.width;
+  const dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+  const dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+  zoomDlg.animate(
+    [{ transform: `translate(${dx}px,${dy}px) scale(${scale})`, opacity: 0.4 },
+     { transform: 'none', opacity: 1 }],
+    { duration: 220, easing: 'cubic-bezier(.2,.75,.3,1)' });
+}
+// الضغط على الخلفية السوداء يسكّر (وزر Esc يشتغل من نفسه)
+zoomDlg.onclick = e => { if (e.target === zoomDlg) zoomDlg.close(); };
+zoomDlg.addEventListener('close', () => { live = live.filter(L => !L.zoom); });
+
+// ===== التحميل والمشاركة =====
+function toBlob(spec) {
+  const sz = size(), c = document.createElement('canvas');
+  c.width = sz.w; c.height = sz.h;
+  drawPost(c.getContext('2d'), sz.w, sz.h, applyFont(spec), fields());
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+
+async function save(spec) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(await toBlob(spec));
+  a.download = 'post.png';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// ===== تصدير الفيديو =====
+// نفضّل MP4 لأن إنستقرام يقبله مباشرة. WebM بديل لو المتصفح ما يعرف MP4.
+const VIDEO_TYPES = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+const videoType = typeof MediaRecorder === 'undefined' ? null
+  : VIDEO_TYPES.find(t => MediaRecorder.isTypeSupported(t));
+const canRecord = !!(videoType &&
+  typeof document.createElement('canvas').captureStream === 'function');
+const LOOPS = 2;   // دورتان ≈ ٥-٨ ثوانٍ، يناسب الستوري والريلز
+
+async function saveVideo(spec, btn) {
+  if (!canRecord) return alert(T().noVideo);
+  const label = btn.textContent;
+  btn.textContent = T().recording;
+  btn.disabled = true;
+  try {
+    const sz = size(), f = fields();
+    const c = document.createElement('canvas');
+    c.width = sz.w; c.height = sz.h;
+    const ctx = c.getContext('2d');
+    const rec = new MediaRecorder(c.captureStream(30),
+      { mimeType: videoType, videoBitsPerSecond: 8e6 });
+    const chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    const stopped = new Promise(r => rec.onstop = r);
+
+    drawPost(ctx, sz.w, sz.h, spec, f, 0);
+    rec.start();
+    // الفيديو يتبع نفس السرعة والشدة اللي ضبطها بالمزالج — اللي يشوفه هو اللي ينزّله
+    const dur = cycleMs(spec), total = dur * LOOPS;
+    const start = performance.now();
+    await new Promise(done => {
+      const frame = now => {
+        const el = now - start;
+        drawPost(ctx, sz.w, sz.h, spec, f, (el % dur) / dur);
+        el >= total ? done() : requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+    rec.stop();
+    await stopped;
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(chunks, { type: videoType }));
+    a.download = videoType.startsWith('video/mp4') ? 'post.mp4' : 'post.webm';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } finally {
+    btn.textContent = label;
+    btn.disabled = false;
+  }
+}
+
+async function share(spec) {
+  const file = new File([await toBlob(spec)], 'post.png', { type: 'image/png' });
+  if (!navigator.canShare || !navigator.canShare({ files: [file] })) return save(spec);
+  navigator.share({ files: [file] }).catch(() => {}); // لو سكّر القائمة، ما نسوي شي
+}
+
+// ===== المجموعات والرجوع =====
+const backBtn = document.getElementById('back');
+const useBrand = document.getElementById('useBrand');
+const brandColor = document.getElementById('brandColor');
+const brandAccent = document.getElementById('brandAccent');
+const palettes = () => useBrand.checked ? brandPalettes(brandColor.value, brandAccent.value) : PALETTES;
+
+function build() {
+  specs = makeSpecs((base + step * 7919) >>> 0, COUNT, palettes());
+  backBtn.disabled = step === 0;
+  render();
+  loadFonts().then(render); // نعيد الرسم لما توصل الخطوط الحقيقية
+}
+const go = d => { step = Math.max(0, step + d); build(); };
+
+document.getElementById('more').onclick = () => go(1);
+backBtn.onclick = () => go(-1);
+// تغيير النص ممكن يبدّل لغة المنشور، فنحتاج خطوطاً ثانية
+[titleEl, subEl, nameEl].forEach(i => i.addEventListener('input', () => {
+  render();
+  loadFonts().then(render);
+}));
+
+// ===== العلامة التجارية =====
+[useBrand, brandColor, brandAccent].forEach(el => el.addEventListener('input', build));
+brandFont.addEventListener('change', () => { render(); loadFonts().then(render); });
+
+const logoInput = document.getElementById('logo');
+const clearLogo = document.getElementById('clearLogo');
+logoInput.addEventListener('change', () => {
+  const file = logoInput.files[0];
+  if (!file) return;
+  if (logo) URL.revokeObjectURL(logo.src);
+  const img = new Image();
+  img.onload = () => { logo = img; clearLogo.hidden = false; render(); };
+  img.onerror = () => alert(T().badImage);
+  img.src = URL.createObjectURL(file);
+});
+clearLogo.onclick = () => {
+  if (logo) URL.revokeObjectURL(logo.src);
+  logo = null; logoInput.value = ''; clearLogo.hidden = true; render();
+};
+
+// إعدادات العلامة تنحفظ بالمتصفح — يضبطها مرة وحدة وخلاص (الشعار ما ينحفظ)
+const BRAND_KEY = 'brand';
+function loadBrand() {
+  try {
+    const s = JSON.parse(localStorage.getItem(BRAND_KEY));
+    if (!s) return;
+    useBrand.checked = s.useBrand;
+    brandColor.value = s.brandColor;
+    brandAccent.value = s.brandAccent;
+    brandFont.value = s.brandFont;
+    if (s.useBrand || s.brandFont) document.getElementById('brandBox').open = true;
+  } catch { /* إعدادات معطوبة؟ نبدأ بالافتراضي */ }
+}
+[useBrand, brandColor, brandAccent, brandFont].forEach(el =>
+  el.addEventListener('change', () => localStorage.setItem(BRAND_KEY, JSON.stringify({
+    useBrand: useBrand.checked, brandColor: brandColor.value,
+    brandAccent: brandAccent.value, brandFont: brandFont.value,
+  }))));
+
+// ===== الصورة =====
+const photoInput = document.getElementById('photo');
+const clearPhoto = document.getElementById('clearPhoto');
+photoInput.addEventListener('change', () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  if (image) URL.revokeObjectURL(image.src);
+  const img = new Image();
+  img.onload = () => { image = img; clearPhoto.hidden = false; render(); };
+  img.onerror = () => alert(T().badImage);
+  img.src = URL.createObjectURL(file);
+});
+clearPhoto.onclick = () => {
+  if (image) URL.revokeObjectURL(image.src);
+  image = null; photoInput.value = ''; clearPhoto.hidden = true; render();
+};
+
+// اسم المحل ما يتغيّر كل مرة — نحفظه بالمتصفح عشان ما يعيد كتابته
+nameEl.value = localStorage.getItem('shopName') ||
+  (ui === 'ar' ? 'مطعم الديوان' : 'Diwan Café');
+nameEl.addEventListener('input', () => localStorage.setItem('shopName', nameEl.value));
+
+paintUI();
+loadBrand();
+applyType();
+build();
